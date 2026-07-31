@@ -1,7 +1,7 @@
 {
-  "name": "企业与民警信息管理系统",
-  "short_name": "民警管理系统",
-  "description": "企业与民警信息管理 — 可安装 Web App",
+  "name": "印章业务信息管理系统",
+  "short_name": "印章管理系统",
+  "description": "印章业务信息管理 — 可安装 Web App",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
