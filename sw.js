@@ -4,7 +4,7 @@
 // SW_VERSION 会在每次构建时被注入为构建时间戳（见 vite.config.js 的 inject-sw-version 插件），
 // 使浏览器能检测到「有新版本」。新版本激活后，会强制刷新所有已打开的 PWA 窗口，
 // 确保安装版始终运行最新代码，避免出现「浏览器已更新、PWA 仍跑旧代码（如保存失效）」的不一致。
-const SW_VERSION = '1785661014561'
+const SW_VERSION = '1785661182553'
 const CACHE = 'ep-shell-v1'
 const APP_SHELL = ['./', './index.html']
 
