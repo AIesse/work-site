@@ -2,18 +2,24 @@
 // 出于隐私考虑，不缓存跨域的 GitHub API 请求（含私有数据 + PAT），离线时仅能打开外壳、数据需联网加载。
 //
 // SW_VERSION 会在每次构建时被注入为构建时间戳（见 vite.config.js 的 inject-sw-version 插件），
-// 使浏览器能检测到「有新版本」。新版本激活后，会强制刷新所有已打开的 PWA 窗口，
-// 确保安装版始终运行最新代码，避免出现「浏览器已更新、PWA 仍跑旧代码（如保存失效）」的不一致。
-const SW_VERSION = '1785672627748'
+// 使浏览器能检测到「有新版本」。新版就绪后**不再由 SW 自行强制刷新页面**，
+// 而是等待前端 main.jsx 发送 SKIP_WAITING，由前端在「更新进度提示」中平滑接管并重启，
+// 避免无提示的突然刷新、并能在更新时向用户展示进度。
+const SW_VERSION = '1785672936622'
 const CACHE = 'ep-shell-v1'
 const APP_SHELL = ['./', './index.html']
 
 self.addEventListener('install', (event) => {
+  event.waitUntil(caches.open(CACHE).then((c) => c.addAll(APP_SHELL)))
+  // 兜底：若 10s 内前端未发送 SKIP_WAITING（异常场景），自动跳过等待，
+  // 确保更新最终生效。正常情况由前端在「更新就绪」提示后主动触发。
   event.waitUntil(
-    caches
-      .open(CACHE)
-      .then((c) => c.addAll(APP_SHELL))
-      .then(() => self.skipWaiting())
+    new Promise((resolve) => {
+      setTimeout(() => {
+        self.skipWaiting()
+        resolve()
+      }, 10000)
+    })
   )
 })
 
@@ -25,20 +31,13 @@ self.addEventListener('activate', (event) => {
       await Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k)))
       // 立即接管所有已打开的页面（包括尚未重新加载的 PWA 窗口）
       await self.clients.claim()
-      // 强制刷新所有已打开的窗口，使其加载最新代码（旧版 PWA 也能借此自愈）
-      const cls = await self.clients.matchAll({ includeUncontrolled: true, type: 'window' })
-      for (const c of cls) {
-        try {
-          await c.navigate(c.url)
-        } catch (_) {
-          /* 某些客户端不支持 navigate，忽略 */
-        }
-      }
+      // 不再强制 navigate 所有窗口：更新进度与刷新时机统一由前端 main.jsx 控制，
+      // 避免与「更新完成 → 手动 reload」重复刷新造成闪烁。
     })()
   )
 })
 
-// 允许页面主动要求跳过等待（配合前端的 reg.update()）
+// 允许页面主动要求跳过等待（配合前端的 reg.update() + 更新进度提示）
 self.addEventListener('message', (event) => {
   if (event.data && event.data.type === 'SKIP_WAITING') self.skipWaiting()
 })
