@@ -5,7 +5,7 @@
 // 使浏览器能检测到「有新版本」。新版就绪后**不再由 SW 自行强制刷新页面**，
 // 而是等待前端 main.jsx 发送 SKIP_WAITING，由前端在「更新进度提示」中平滑接管并重启，
 // 避免无提示的突然刷新、并能在更新时向用户展示进度。
-const SW_VERSION = '1786025208960'
+const SW_VERSION = '1786026972999'
 const CACHE = 'ep-shell-v1'
 const APP_SHELL = ['./', './index.html']
 
@@ -71,6 +71,32 @@ self.addEventListener('notificationclick', (event) => {
       }
       if (self.clients.openWindow) await self.clients.openWindow(target)
     })()
+  )
+})
+
+// Web Push 推送到达：Worker 发的是「空载荷」信号，展示本地化通用通知；
+// 若日后携带载荷（event.data 不为空），优先解析 title/body。
+self.addEventListener('push', (event) => {
+  let title = '印章业务信息管理系统'
+  let body = '有新的问题清单待处理，请打开应用查看'
+  try {
+    if (event.data) {
+      const p = event.data.json()
+      if (p && p.title) title = p.title
+      if (p && p.body) body = p.body
+    }
+  } catch (_) {
+    /* 解析失败则用默认文案 */
+  }
+  event.waitUntil(
+    self.registration.showNotification(title, {
+      body,
+      icon: './icon-192.png',
+      badge: './icon-192.png',
+      tag: 'ep-inbox',
+      renotify: true,
+      data: { path: '/?view=inbox' },
+    })
   )
 })
 
