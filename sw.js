@@ -5,7 +5,7 @@
 // 使浏览器能检测到「有新版本」。新版就绪后**不再由 SW 自行强制刷新页面**，
 // 而是等待前端 main.jsx 发送 SKIP_WAITING，由前端在「更新进度提示」中平滑接管并重启，
 // 避免无提示的突然刷新、并能在更新时向用户展示进度。
-const SW_VERSION = '1786020720064'
+const SW_VERSION = '1786022120149'
 const CACHE = 'ep-shell-v1'
 const APP_SHELL = ['./', './index.html']
 
@@ -40,6 +40,27 @@ self.addEventListener('activate', (event) => {
 // 允许页面主动要求跳过等待（配合前端的 reg.update() + 更新进度提示）
 self.addEventListener('message', (event) => {
   if (event.data && event.data.type === 'SKIP_WAITING') self.skipWaiting()
+})
+
+// 点击通知：聚焦已打开的 PWA 窗口（或新开一个），并跳转到问题清单
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close()
+  const target = (event.notification.data && event.notification.data.path) || '/?view=inbox'
+  event.waitUntil(
+    (async () => {
+      const all = await self.clients.matchAll({ type: 'window', includeUncontrolled: true })
+      for (const c of all) {
+        if ('focus' in c) {
+          try {
+            await c.focus()
+            if (c.navigate) c.navigate(target)
+          } catch (_) {}
+          return
+        }
+      }
+      if (self.clients.openWindow) await self.clients.openWindow(target)
+    })()
+  )
 })
 
 self.addEventListener('fetch', (event) => {
