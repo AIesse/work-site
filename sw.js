@@ -1,1 +1,139 @@
-Ly8gU2VydmljZSBXb3JrZXLvvJrlrp7njrAgUFdBIOemu+e6v+WPr+aJk+W8gO+8iOS7hee8k+WtmOWQjOa6kOeahOW6lOeUqOWkluWjs+S4jumdmeaAgei1hOa6kO+8iQovLyDlh7rkuo7pmpDnp4HogIPomZHvvIzkuI3nvJPlrZjot6jln5/nmoQgR2l0SHViIEFQSSDor7fmsYLvvIjlkKvnp4HmnInmlbDmja4gKyBQQVTvvInvvIznprvnur/ml7bku4Xog73miZPlvIDlpJblo7PjgIHmlbDmja7pnIDogZTnvZHliqDovb3jgIIKLy8KLy8gU1dfVkVSU0lPTiDkvJrlnKjmr4/mrKHmnoTlu7rml7booqvms6jlhaXkuLrmnoTlu7rml7bpl7TmiLPvvIjop4Egdml0ZS5jb25maWcuanMg55qEIGluamVjdC1zdy12ZXJzaW9uIOaPkuS7tu+8ie+8jAovLyDkvb/mtY/op4jlmajog73mo4DmtYvliLDjgIzmnInmlrDniYjmnKzjgI3jgILmlrDniYjlsLHnu6rlkI4qKuS4jeWGjeeUsSBTVyDoh6rooYzlvLrliLbliLfmlrDpobXpnaIqKu+8jAovLyDogIzmmK/nrYnlvoXliY3nq68gbWFpbi5qc3gg5Y+R6YCBIFNLSVBfV0FJVElOR++8jOeUseWJjeerr+WcqOOAjOabtOaWsOi/m+W6puaPkOekuuOAjeS4reW5s+a7keaOpeeuoeW5tumHjeWQr++8jAovLyDpgb/lhY3ml6Dmj5DnpLrnmoTnqoHnhLbliLfmlrDjgIHlubbog73lnKjmm7TmlrDml7blkJHnlKjmiLflsZXnpLrov5vluqbjgIIKY29uc3QgU1dfVkVSU0lPTiA9ICcxNzg2MDY1MDE2Mzg5Jwpjb25zdCBDQUNIRSA9ICdlcC1zaGVsbC12MScKY29uc3QgQVBQX1NIRUxMID0gWycuLycsICcuL2luZGV4Lmh0bWwnXQoKc2VsZi5hZGRFdmVudExpc3RlbmVyKCdpbnN0YWxsJywgKGV2ZW50KSA9PiB7CiAgZXZlbnQud2FpdFVudGlsKGNhY2hlcy5vcGVuKENBQ0hFKS50aGVuKChjKSA9PiBjLmFkZEFsbChBUFBfU0hFTEwpKSkKICAvLyDlhZzlupXvvJroi6UgMTBzIOWGheWJjeerr+acquWPkemAgSBTS0lQX1dBSVRJTkfvvIjlvILluLjlnLrmma/vvInvvIzoh6rliqjot7Pov4fnrYnlvoXvvIwKICAvLyDnoa7kv53mm7TmlrDmnIDnu4jnlJ/mlYjjgILmraPluLjmg4XlhrXnlLHliY3nq6/lnKjjgIzmm7TmlrDlsLHnu6rjgI3mj5DnpLrlkI7kuLvliqjop6blj5HjgIIKICBldmVudC53YWl0VW50aWwoCiAgICBuZXcgUHJvbWlzZSgocmVzb2x2ZSkgPT4gewogICAgICBzZXRUaW1lb3V0KCgpID0+IHsKICAgICAgICBzZWxmLnNraXBXYWl0aW5nKCkKICAgICAgICByZXNvbHZlKCkKICAgICAgfSwgMTAwMDApCiAgICB9KQogICkKfSkKCnNlbGYuYWRkRXZlbnRMaXN0ZW5lcignYWN0aXZhdGUnLCAoZXZlbnQpID0+IHsKICBldmVudC53YWl0VW50aWwoCiAgICAoYXN5bmMgKCkgPT4gewogICAgICAvLyDmuIXnkIbpnZ7lvZPliY3niYjmnKznmoTml6fnvJPlrZjvvIjpgb/lhY3pnZnmgIHotYTmupDml6DpmZDntK/np6/vvIkKICAgICAgY29uc3Qga2V5cyA9IGF3YWl0IGNhY2hlcy5rZXlzKCkKICAgICAgYXdhaXQgUHJvbWlzZS5hbGwoa2V5cy5maWx0ZXIoKGspID0+IGsgIT09IENBQ0hFKS5tYXAoKGspID0+IGNhY2hlcy5kZWxldGUoaykpKQogICAgICAvLyDnq4vljbPmjqXnrqHmiYDmnInlt7LmiZPlvIDnmoTpobXpnaLvvIjljIXmi6zlsJrmnKrph43mlrDliqDovb3nmoQgUFdBIOeql+WPo++8iQogICAgICBhd2FpdCBzZWxmLmNsaWVudHMuY2xhaW0oKQogICAgICAvLyDkuI3lho3lvLrliLYgbmF2aWdhdGUg5omA5pyJ56qX5Y+j77ya5pu05paw6L+b5bqm5LiO5Yi35paw5pe25py657uf5LiA55Sx5YmN56uvIG1haW4uanN4IOaOp+WItu+8jAogICAgICAvLyDpgb/lhY3kuI7jgIzmm7TmlrDlrozmiJAg4oaSIOaJi+WKqCByZWxvYWTjgI3ph43lpI3liLfmlrDpgKDmiJDpl6rng4HjgIIKICAgIH0pKCkKICApCn0pCgovLyDlhYHorrjpobXpnaLkuLvliqjopoHmsYLot7Pov4fnrYnlvoXvvIjphY3lkIjliY3nq6/nmoQgcmVnLnVwZGF0ZSgpICsg5pu05paw6L+b5bqm5o+Q56S677yJCnNlbGYuYWRkRXZlbnRMaXN0ZW5lcignbWVzc2FnZScsIChldmVudCkgPT4gewogIGNvbnN0IGRhdGEgPSBldmVudC5kYXRhIHx8IHt9CiAgaWYgKGRhdGEudHlwZSA9PT0gJ1NLSVBfV0FJVElORycpIHNlbGYuc2tpcFdhaXRpbmcoKQogIGVsc2UgaWYgKGRhdGEudHlwZSA9PT0gJ2tlZXBhbGl2ZScpIHsKICAgIC8vIOaUtuWIsOW/g+i3s+WNs+WUpOmGkiBTV++8iOS6i+S7tuacrOi6q+iuqSBTVyDkv53mjIHmtLvot4PvvInvvJvlm57miafnu5nlj5HpgIHmlrnku6Xnoa7orqTpk77ot6/pgJrnlYUKICAgIGlmIChldmVudC5zb3VyY2UgJiYgZXZlbnQuc291cmNlLnBvc3RNZXNzYWdlKSB7CiAgICAgIHRyeSB7CiAgICAgICAgZXZlbnQuc291cmNlLnBvc3RNZXNzYWdlKHsgdHlwZTogJ2tlZXBhbGl2ZV9hY2snLCB0OiBkYXRhLnQgfSkKICAgICAgfSBjYXRjaCAoXykgewogICAgICAgIC8qIGlnbm9yZSAqLwogICAgICB9CiAgICB9CiAgfQp9KQoKLy8g54K55Ye76YCa55+l77ya6IGa54Sm5bey5omT5byA55qEIFBXQSDnqpflj6PvvIjmiJbmlrDlvIDkuIDkuKrvvInvvIzlubbot7PovazliLDpl67popjmuIXljZUKc2VsZi5hZGRFdmVudExpc3RlbmVyKCdub3RpZmljYXRpb25jbGljaycsIChldmVudCkgPT4gewogIGV2ZW50Lm5vdGlmaWNhdGlvbi5jbG9zZSgpCiAgY29uc3QgdGFyZ2V0ID0gKGV2ZW50Lm5vdGlmaWNhdGlvbi5kYXRhICYmIGV2ZW50Lm5vdGlmaWNhdGlvbi5kYXRhLnBhdGgpIHx8ICcvP3ZpZXc9aW5ib3gnCiAgZXZlbnQud2FpdFVudGlsKAogICAgKGFzeW5jICgpID0+IHsKICAgICAgY29uc3QgYWxsID0gYXdhaXQgc2VsZi5jbGllbnRzLm1hdGNoQWxsKHsgdHlwZTogJ3dpbmRvdycsIGluY2x1ZGVVbmNvbnRyb2xsZWQ6IHRydWUgfSkKICAgICAgZm9yIChjb25zdCBjIG9mIGFsbCkgewogICAgICAgIGlmICgnZm9jdXMnIGluIGMpIHsKICAgICAgICAgIHRyeSB7CiAgICAgICAgICAgIGF3YWl0IGMuZm9jdXMoKQogICAgICAgICAgICBpZiAoYy5uYXZpZ2F0ZSkgYy5uYXZpZ2F0ZSh0YXJnZXQpCiAgICAgICAgICB9IGNhdGNoIChfKSB7fQogICAgICAgICAgcmV0dXJuCiAgICAgICAgfQogICAgICB9CiAgICAgIGlmIChzZWxmLmNsaWVudHMub3BlbldpbmRvdykgYXdhaXQgc2VsZi5jbGllbnRzLm9wZW5XaW5kb3codGFyZ2V0KQogICAgfSkoKQogICkKfSkKCi8vIFdlYiBQdXNoIOaOqOmAgeWIsOi+vu+8mldvcmtlciDlj5HnmoTmmK/jgIznqbrovb3ojbfjgI3kv6Hlj7fvvIzlsZXnpLrmnKzlnLDljJbpgJrnlKjpgJrnn6XvvJsKLy8g6Iul5pel5ZCO5pC65bim6L296I2377yIZXZlbnQuZGF0YSDkuI3kuLrnqbrvvInvvIzkvJjlhYjop6PmnpAgdGl0bGUvYm9keeOAggpzZWxmLmFkZEV2ZW50TGlzdGVuZXIoJ3B1c2gnLCAoZXZlbnQpID0+IHsKICBsZXQgdGl0bGUgPSAn5Y2w56ug5Lia5Yqh5L+h5oGv566h55CG57O757ufJwogIGxldCBib2R5ID0gJ+acieaWsOeahOmXrumimOa4heWNleW+heWkhOeQhu+8jOivt+aJk+W8gOW6lOeUqOafpeeciycKICB0cnkgewogICAgaWYgKGV2ZW50LmRhdGEpIHsKICAgICAgY29uc3QgcCA9IGV2ZW50LmRhdGEuanNvbigpCiAgICAgIGlmIChwICYmIHAudGl0bGUpIHRpdGxlID0gcC50aXRsZQogICAgICBpZiAocCAmJiBwLmJvZHkpIGJvZHkgPSBwLmJvZHkKICAgIH0KICB9IGNhdGNoIChfKSB7CiAgICAvKiDop6PmnpDlpLHotKXliJnnlKjpu5jorqTmlofmoYggKi8KICB9CiAgZXZlbnQud2FpdFVudGlsKAogICAgc2VsZi5yZWdpc3RyYXRpb24uc2hvd05vdGlmaWNhdGlvbih0aXRsZSwgewogICAgICBib2R5LAogICAgICBpY29uOiAnLi9pY29uLTE5Mi5wbmcnLAogICAgICBiYWRnZTogJy4vaWNvbi0xOTIucG5nJywKICAgICAgdGFnOiAnZXAtaW5ib3gnLAogICAgICByZW5vdGlmeTogdHJ1ZSwKICAgICAgZGF0YTogeyBwYXRoOiAnLz92aWV3PWluYm94JyB9LAogICAgfSkKICApCn0pCgpzZWxmLmFkZEV2ZW50TGlzdGVuZXIoJ2ZldGNoJywgKGV2ZW50KSA9PiB7CiAgY29uc3QgcmVxID0gZXZlbnQucmVxdWVzdAogIGlmIChyZXEubWV0aG9kICE9PSAnR0VUJykgcmV0dXJuCiAgY29uc3QgdXJsID0gbmV3IFVSTChyZXEudXJsKQogIC8vIOWPquWkhOeQhuWQjOa6kOivt+axgu+8m+i3qOWfn++8iGFwaS5naXRodWIuY29tIOetie+8ieebtOaOpeaUvuihjO+8jOS4jee8k+WtmAogIGlmICh1cmwub3JpZ2luICE9PSBzZWxmLmxvY2F0aW9uLm9yaWdpbikgcmV0dXJuCgogIC8vIOWvvOiIquivt+axgu+8muS8mOWFiOe9kee7nO+8jOWksei0peaXtuWbnumAgOW3sue8k+WtmOeahCBpbmRleC5odG1s77yI5pSv5oyB56a757q/5omT5byA77yJCiAgaWYgKHJlcS5tb2RlID09PSAnbmF2aWdhdGUnKSB7CiAgICBldmVudC5yZXNwb25kV2l0aCgKICAgICAgZmV0Y2gocmVxKQogICAgICAgIC50aGVuKChyZXMpID0+IHsKICAgICAgICAgIGNvbnN0IGNvcHkgPSByZXMuY2xvbmUoKQogICAgICAgICAgY2FjaGVzLm9wZW4oQ0FDSEUpLnRoZW4oKGMpID0+IGMucHV0KCcuL2luZGV4Lmh0bWwnLCBjb3B5KSkKICAgICAgICAgIHJldHVybiByZXMKICAgICAgICB9KQogICAgICAgIC5jYXRjaCgoKSA9PiBjYWNoZXMubWF0Y2goJy4vaW5kZXguaHRtbCcpLnRoZW4oKHIpID0+IHIgfHwgY2FjaGVzLm1hdGNoKCcuLycpKSkKICAgICkKICAgIHJldHVybgogIH0KCiAgLy8g6Z2Z5oCB6LWE5rqQ77yI5bimIGhhc2gg55qEIGFzc2V0c++8ie+8mmNhY2hlLWZpcnN077yM5ZG95Lit5Y2z6L+U5Zue77yM5ZCO5Y+w6Z2Z6buY5pu05pawCiAgZXZlbnQucmVzcG9uZFdpdGgoCiAgICBjYWNoZXMubWF0Y2gocmVxKS50aGVuKChjYWNoZWQpID0+IHsKICAgICAgY29uc3QgbmV0d29yayA9IGZldGNoKHJlcSkKICAgICAgICAudGhlbigocmVzKSA9PiB7CiAgICAgICAgICBpZiAocmVzICYmIHJlcy5zdGF0dXMgPT09IDIwMCkgewogICAgICAgICAgICBjb25zdCBjb3B5ID0gcmVzLmNsb25lKCkKICAgICAgICAgICAgY2FjaGVzLm9wZW4oQ0FDSEUpLnRoZW4oKGMpID0+IGMucHV0KHJlcSwgY29weSkpCiAgICAgICAgICB9CiAgICAgICAgICByZXR1cm4gcmVzCiAgICAgICAgfSkKICAgICAgICAuY2F0Y2goKCkgPT4gY2FjaGVkKQogICAgICByZXR1cm4gY2FjaGVkIHx8IG5ldHdvcmsKICAgIH0pCiAgKQp9KQo=
+// Service Worker：实现 PWA 离线可打开（仅缓存同源的应用外壳与静态资源）
+// 出于隐私考虑，不缓存跨域的 GitHub API 请求（含私有数据 + PAT），离线时仅能打开外壳、数据需联网加载。
+//
+// SW_VERSION 会在每次构建时被注入为构建时间戳（见 vite.config.js 的 inject-sw-version 插件），
+// 使浏览器能检测到「有新版本」。新版就绪后**不再由 SW 自行强制刷新页面**，
+// 而是等待前端 main.jsx 发送 SKIP_WAITING，由前端在「更新进度提示」中平滑接管并重启，
+// 避免无提示的突然刷新、并能在更新时向用户展示进度。
+const SW_VERSION = '1786065726734'
+const CACHE = 'ep-shell-v1'
+const APP_SHELL = ['./', './index.html']
+
+self.addEventListener('install', (event) => {
+  event.waitUntil(caches.open(CACHE).then((c) => c.addAll(APP_SHELL)))
+  // 兜底：若 10s 内前端未发送 SKIP_WAITING（异常场景），自动跳过等待，
+  // 确保更新最终生效。正常情况由前端在「更新就绪」提示后主动触发。
+  event.waitUntil(
+    new Promise((resolve) => {
+      setTimeout(() => {
+        self.skipWaiting()
+        resolve()
+      }, 10000)
+    })
+  )
+})
+
+self.addEventListener('activate', (event) => {
+  event.waitUntil(
+    (async () => {
+      // 清理非当前版本的旧缓存（避免静态资源无限累积）
+      const keys = await caches.keys()
+      await Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k)))
+      // 立即接管所有已打开的页面（包括尚未重新加载的 PWA 窗口）
+      await self.clients.claim()
+      // 不再强制 navigate 所有窗口：更新进度与刷新时机统一由前端 main.jsx 控制，
+      // 避免与「更新完成 → 手动 reload」重复刷新造成闪烁。
+    })()
+  )
+})
+
+// 允许页面主动要求跳过等待（配合前端的 reg.update() + 更新进度提示）
+self.addEventListener('message', (event) => {
+  const data = event.data || {}
+  if (data.type === 'SKIP_WAITING') self.skipWaiting()
+  else if (data.type === 'keepalive') {
+    // 收到心跳即唤醒 SW（事件本身让 SW 保持活跃）；回执给发送方以确认链路通畅
+    if (event.source && event.source.postMessage) {
+      try {
+        event.source.postMessage({ type: 'keepalive_ack', t: data.t })
+      } catch (_) {
+        /* ignore */
+      }
+    }
+  }
+})
+
+// 点击通知：聚焦已打开的 PWA 窗口（或新开一个），并跳转到问题清单
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close()
+  const target = (event.notification.data && event.notification.data.path) || '/?view=inbox'
+  event.waitUntil(
+    (async () => {
+      const all = await self.clients.matchAll({ type: 'window', includeUncontrolled: true })
+      for (const c of all) {
+        if ('focus' in c) {
+          try {
+            await c.focus()
+            if (c.navigate) c.navigate(target)
+          } catch (_) {}
+          return
+        }
+      }
+      if (self.clients.openWindow) await self.clients.openWindow(target)
+    })()
+  )
+})
+
+// Web Push 推送到达：Worker 发的是「空载荷」信号，展示本地化通用通知；
+// 若日后携带载荷（event.data 不为空），优先解析 title/body。
+self.addEventListener('push', (event) => {
+  let title = '印章业务信息管理系统'
+  let body = '有新的问题清单待处理，请打开应用查看'
+  try {
+    if (event.data) {
+      const p = event.data.json()
+      if (p && p.title) title = p.title
+      if (p && p.body) body = p.body
+    }
+  } catch (_) {
+    /* 解析失败则用默认文案 */
+  }
+  event.waitUntil(
+    self.registration.showNotification(title, {
+      body,
+      icon: './icon-192.png',
+      badge: './icon-192.png',
+      tag: 'ep-inbox',
+      renotify: true,
+      data: { path: '/?view=inbox' },
+    })
+  )
+})
+
+self.addEventListener('fetch', (event) => {
+  const req = event.request
+  if (req.method !== 'GET') return
+  const url = new URL(req.url)
+  // 只处理同源请求；跨域（api.github.com 等）直接放行，不缓存
+  if (url.origin !== self.location.origin) return
+
+  // 导航请求：优先网络，失败时回退已缓存的 index.html（支持离线打开）
+  if (req.mode === 'navigate') {
+    event.respondWith(
+      fetch(req)
+        .then((res) => {
+          const copy = res.clone()
+          caches.open(CACHE).then((c) => c.put('./index.html', copy))
+          return res
+        })
+        .catch(() => caches.match('./index.html').then((r) => r || caches.match('./')))
+    )
+    return
+  }
+
+  // 静态资源（带 hash 的 assets）：cache-first，命中即返回，后台静默更新
+  event.respondWith(
+    caches.match(req).then((cached) => {
+      const network = fetch(req)
+        .then((res) => {
+          if (res && res.status === 200) {
+            const copy = res.clone()
+            caches.open(CACHE).then((c) => c.put(req, copy))
+          }
+          return res
+        })
+        .catch(() => cached)
+      return cached || network
+    })
+  )
+})
