@@ -81,6 +81,10 @@
           <label for="content">问题内容<span class="req">*</span></label>
           <textarea id="content" placeholder="请详细描述您遇到的问题（如：某某功能无法使用、数据异常等）…"></textarea>
         </div>
+        <div class="field">
+          <label for="attachment">附件（可选）</label>
+          <input id="attachment" type="file" />
+        </div>
 
         <!-- 基础防护：蜜罐字段，正常用户不可见，仅机器人自动填充；命中则视为垃圾提交 -->
         <input class="hp" id="hp" type="text" tabindex="-1" autocomplete="off" aria-hidden="true" />
@@ -108,6 +112,7 @@
     const $ = (id) => document.getElementById(id)
     const districtSel = $('district'), companySel = $('company')
     const contactEl = $('contact'), phoneEl = $('phone'), ptypeEl = $('ptype'), contentEl = $('content')
+    const attachmentEl = $('attachment')
     const hpEl = $('hp')
     const statusEl = $('status'), submitBtn = $('submitBtn'), rateHint = $('rateHint'), formEl = $('form')
 
@@ -244,6 +249,33 @@
       setStatus('loading', '正在提交…')
       try {
         let { rows, sha } = await getInbox(token)
+
+        // 附件：优先走本机存储服务（经 Worker /upload 中继，本地不可达时无缝回退 GitHub）。
+        // 上传在写入收件箱之前完成；失败仅跳过附件，不阻断文字提交。
+        let attachment = ''
+        const f = attachmentEl.files && attachmentEl.files[0]
+        if (f) {
+          const wu = window.PUSH_WORKER_URL || ''
+          const sec = window.PUSH_NOTIFY_SECRET || ''
+          if (!wu || !sec) {
+            setStatus('warn', '附件通道未配置，已跳过附件，仅提交文字内容。')
+          } else {
+            try {
+              const up = await fetch(`${wu}/upload?secret=${encodeURIComponent(sec)}`, {
+                method: 'POST',
+                body: f,
+                headers: { 'Content-Type': f.type || 'application/octet-stream', 'x-filename': encodeURIComponent(f.name || 'file') },
+              })
+              if (!up.ok) throw new Error('上传失败 (' + up.status + ')')
+              const uj = await up.json()
+              if (!uj || !uj.url) throw new Error('未返回附件地址')
+              attachment = uj.url
+            } catch (e) {
+              setStatus('warn', '附件上传失败，已跳过附件：' + (e.message || e))
+            }
+          }
+        }
+
         const rec = {
           id: nextId(rows),
           district,
@@ -252,6 +284,7 @@
           contact_person,
           contact_phone,
           content,
+          attachment,
           type: ptypeEl.value,
           status: '待处理',
           created_at: new Date().toISOString(),

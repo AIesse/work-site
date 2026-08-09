@@ -26,3 +26,10 @@ window.__PUSH_CONFIG__ = {
   workerUrl: 'https://enterprise-police-push.xiyiread.workers.dev',
   vapidPublicKey: 'BHGmCwsOK01-_60r5ZvJy3HfDFTsBTNtKaf4Vsw3dFxNxCfvmVM_DN1Y9B1WTVY0z0hkU0I37jOT83fg8O3sN5Q',
 }
+
+// ===== 附件读取令牌 =====
+// 本机文件存储服务（/files）与 Worker 的 /gh-file 代理都要求 x-token 才能读取（防链接裸奔）。
+// 与 Worker 端 LOCAL_TOKEN、本机服务 run.sh 的 LOCAL_TOKEN 必须一致。
+// 仅作读鉴权软闸；公开页下发属预期（同 NOTIFY_SECRET 信任模型）。
+// 注：不设置 __ATTACHMENT_BASE_URL__，保留管理端原有「GitHub 兜底」上传通道（架构不动、无缝退回）。
+window.__ATTACHMENT_TOKEN__ = 'ugw_w0juumI_uOSc45AAl-eocyBELdDL'
