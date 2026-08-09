@@ -16,4 +16,13 @@ window.INBOX_REPO = { owner: 'AIesse', name: 'inbox', branch: 'main', file: 'inb
 // 2) PUSH_WORKER_URL（可选）：显式指定 Worker 地址；留空则自动复用管理端「设置」里填的
 //    Worker 地址（同源 localStorage：ep_push_worker_url）。两者任一可用即可。
 window.PUSH_NOTIFY_SECRET = '0ArgJChv9FMwQhGr' + 'yzQOUyk-e5jqzmwU' + 'cHDmzeMRoIy4g5CO'
-// window.PUSH_WORKER_URL = 'https://enterprise-police-push.<你的subdomain>.workers.dev'
+// 显式指定 Worker 地址：客户提交页 submit.html 据此直接调用 /notify 实现「进件零延迟」即时推送。
+// 不能留空——否则客户浏览器没有 ep_push_worker_url，即时推送不会触发，只能退回等 10 分钟 cron。
+window.PUSH_WORKER_URL = 'https://enterprise-police-push.xiyiread.workers.dev'
+// 注入 Web Push 配置：使管理端「设置」里的订阅开关免手动填写即可出现并可用
+// （与 webpush.js 的 getPushConfig() 选项 A 对应）。vapidPublicKey 为公开密钥，与 Worker 端
+// VAPID_PUBLIC_KEY 一致，非机密，可随公开页下发。
+window.__PUSH_CONFIG__ = {
+  workerUrl: 'https://enterprise-police-push.xiyiread.workers.dev',
+  vapidPublicKey: 'BHGmCwsOK01-_60r5ZvJy3HfDFTsBTNtKaf4Vsw3dFxNxCfvmVM_DN1Y9B1WTVY0z0hkU0I37jOT83fg8O3sN5Q',
+}
