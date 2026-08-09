@@ -186,6 +186,22 @@
       throw new Error('写入收件箱失败 (' + r.status + ')')
     }
 
+    // 即时通知：写入成功后通知 Worker 立即向订阅端推送（零轮询延迟）。
+    // 失败静默跳过——Worker 偶发不可达时由 10 分钟 cron 兜底补推，不阻塞用户提交成功提示。
+    async function notifyPush() {
+      const workerUrl = window.PUSH_WORKER_URL || (localStorage.getItem('ep_push_worker_url') || '')
+      const secret = window.PUSH_NOTIFY_SECRET || ''
+      if (!workerUrl || !secret) return
+      try {
+        await fetch(`${workerUrl}/notify?secret=${encodeURIComponent(secret)}`, {
+          method: 'POST',
+          mode: 'cors',
+        })
+      } catch {
+        /* 通知失败不阻断提交流程 */
+      }
+    }
+
     function populateDistricts() {
       const districts = [...new Set(ENTERPRISES.map((e) => e.district).filter(Boolean))].sort()
       districtSel.innerHTML = '<option value="">请选择行政区</option>' + districts.map((d) => `<option value="${d}">${d}</option>`).join('')
@@ -243,6 +259,8 @@
         }
         rows.push(rec)
         await putInbox(token, rows, sha, rec)
+        // 进件入库成功：即时触发推送（fire-and-forget，不阻塞成功提示）
+        notifyPush()
         localStorage.setItem(LAST_KEY, Date.now())
         setStatus('ok', '提交成功！我们已收到您的问题，将尽快处理。')
         contactEl.value = ''; phoneEl.value = ''; contentEl.value = ''
