@@ -15,5 +15,9 @@
   </head>
   <body>
     <div id="root"></div>
+    <!-- 注入附件服务器配置（__ATTACHMENT_BASE_URL__ / __ATTACHMENT_TOKEN__ 等）：
+         必须在主模块前加载，使 attachmentServer.getAttachmentBaseUrl() 能取到本地优先地址，
+         否则 base 为空会直奔 GitHub 兜底。与 submit.html 保持一致。 -->
+    <script src="./inbox-config.js"></script>
   </body>
 </html>
