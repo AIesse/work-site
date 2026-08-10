@@ -32,4 +32,7 @@ window.__PUSH_CONFIG__ = {
 // 与 Worker 端 LOCAL_TOKEN、本机服务 run.sh 的 LOCAL_TOKEN 必须一致。
 // 仅作读鉴权软闸；公开页下发属预期（同 NOTIFY_SECRET 信任模型）。
 // 注：不设置 __ATTACHMENT_BASE_URL__，保留管理端原有「GitHub 兜底」上传通道（架构不动、无缝退回）。
+// ↓↓↓ 已启用：管理端附件直传本机存储服务（本地优先）。store.jsx 的 uploadAttachment 会先传本机，
+//     失败再回退 GitHub（与 submit.html 一致）。URL 为命名隧道 ep-files 的稳定公网地址。
+window.__ATTACHMENT_BASE_URL__ = 'https://files.aiesse.me'
 window.__ATTACHMENT_TOKEN__ = 'ugw_w0juumI_uOSc45AAl-eocyBELdDL'
