@@ -230,6 +230,49 @@
       }
     }
 
+    // 附件上传：主通道直传本机存储服务（与后台管理端同一通道，浏览器 CORS 已验证）；
+    // 仅当本机服务不可达时回退 Worker /upload 中继。返回 { url } 或 { error }。
+    async function uploadAttachmentSmart(file) {
+      const base = (window.__ATTACHMENT_BASE_URL__ || '').trim().replace(/\/+$/, '')
+      const token = (window.__ATTACHMENT_TOKEN__ || '').trim()
+      if (base) {
+        try {
+          const up = await fetch(base + '/upload', {
+            method: 'POST',
+            body: file,
+            headers: {
+              'Content-Type': file.type || 'application/octet-stream',
+              'x-filename': encodeURIComponent(file.name || 'file'),
+              ...(token ? { 'x-token': token } : {}),
+            },
+          })
+          if (!up.ok) throw new Error('直传失败 (' + up.status + ')')
+          const uj = await up.json()
+          if (!uj || !uj.url) throw new Error('未返回附件地址')
+          return { url: uj.url }
+        } catch (e) {
+          /* 直传失败 → 回退 Worker */
+        }
+      }
+      // 回退：Worker /upload（?name= 传递文件名，无 x-filename 头，CORS 友好）。
+      const wu = (window.PUSH_WORKER_URL || '').trim()
+      const sec = (window.PUSH_NOTIFY_SECRET || '').trim()
+      if (!wu || !sec) return { error: base ? '直传失败' : '未配置附件服务' }
+      try {
+        const up = await fetch(`${wu}/upload?secret=${encodeURIComponent(sec)}&name=${encodeURIComponent(file.name || 'file')}`, {
+          method: 'POST',
+          body: file,
+          headers: { 'Content-Type': file.type || 'application/octet-stream' },
+        })
+        if (!up.ok) throw new Error('Worker 失败 (' + up.status + ')')
+        const uj = await up.json()
+        if (!uj || !uj.url) throw new Error('未返回附件地址')
+        return { url: uj.url }
+      } catch (e) {
+        return { error: (e && e.message) || '上传失败' }
+      }
+    }
+
     function populateDistricts() {
       const districts = [...new Set(ENTERPRISES.map((e) => e.district).filter(Boolean))].sort()
       districtSel.innerHTML = '<option value="">请选择行政区</option>' + districts.map((d) => `<option value="${d}">${d}</option>`).join('')
@@ -271,38 +314,27 @@
       submitBtn.disabled = true
       setStatus('loading', '正在提交…')
       let attFailed = false
+      let attErr = ''
       try {
         let { rows, sha } = await getInbox(token)
 
-        // 附件：优先走本机存储服务（经 Worker /upload 中继，本地不可达时无缝回退 GitHub）。
+        // 附件：直传本机存储服务 files.aiesse.me（与后台管理端同一上传通道，浏览器 CORS 已验证可用）；
+        // 仅当本机服务不可达时才回退 Worker /upload 中继。
+        // 注：此前走 Worker（*.workers.dev 默认域名）在部分网络（如中国大陆）被屏蔽/超时，
+        // 导致附件上传失败；files.aiesse.me 为自有域名，与管理站点同源可达，故改为主通道。
         // 上传在写入收件箱之前完成；失败仅跳过附件，不阻断文字提交。
-        // 文件名经 ?name= 传递（Worker 已支持），不再用 x-filename 自定义头，
-        // 避免触发浏览器 CORS 预检被拒（Worker 旧 CORS 仅放行 Content-Type）。
         let attachment = ''
         const f = attachmentEl.files && attachmentEl.files[0]
         if (f) {
-          const wu = window.PUSH_WORKER_URL || ''
-          const sec = window.PUSH_NOTIFY_SECRET || ''
-          if (!wu || !sec) {
-            attFailed = true
-            setStatus('warn', '附件通道未配置，已跳过附件，仅提交文字内容。')
+          setStatus('loading', '正在上传附件：' + f.name + '（' + fmtSize(f.size) + '）…')
+          const res = await uploadAttachmentSmart(f)
+          if (res && res.url) {
+            attachment = res.url
+            setStatus('loading', '附件已上传，正在提交问题…')
           } else {
-            setStatus('loading', '正在上传附件：' + f.name + '（' + fmtSize(f.size) + '）…')
-            try {
-              const up = await fetch(`${wu}/upload?secret=${encodeURIComponent(sec)}&name=${encodeURIComponent(f.name || 'file')}`, {
-                method: 'POST',
-                body: f,
-                headers: { 'Content-Type': f.type || 'application/octet-stream' },
-              })
-              if (!up.ok) throw new Error('上传失败 (' + up.status + ')')
-              const uj = await up.json()
-              if (!uj || !uj.url) throw new Error('未返回附件地址')
-              attachment = uj.url
-              setStatus('loading', '附件已上传，正在提交问题…')
-            } catch (e) {
-              attFailed = true
-              setStatus('warn', '附件上传失败，已跳过附件：' + (e.message || e))
-            }
+            attFailed = true
+            attErr = (res && res.error) || '未知错误'
+            setStatus('warn', '附件上传失败，已跳过附件。')
           }
         }
 
@@ -326,7 +358,7 @@
         notifyPush()
         localStorage.setItem(LAST_KEY, Date.now())
         const okMsg = attFailed
-          ? '问题已提交成功，但附件上传失败，未随附附件。'
+          ? '问题已提交成功，但附件上传失败' + (attErr ? '（' + attErr + '）' : '') + '，未随附附件。'
           : (attachment ? '提交成功！我们已收到您的问题及附件，将尽快处理。' : '提交成功！我们已收到您的问题，将尽快处理。')
         setStatus('ok', okMsg)
         contactEl.value = ''; phoneEl.value = ''; contentEl.value = ''
