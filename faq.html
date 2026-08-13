@@ -71,19 +71,24 @@
       flex: none; font-size: 11.5px; font-weight: 600; color: var(--brand);
       background: #eaf1ff; border: 1px solid #dbeafe; border-radius: 999px; padding: 3px 9px; margin-top: 2px; white-space: nowrap;
     }
-    .qa-q { flex: 1; font-size: 15px; font-weight: 600; line-height: 1.45; }
+    /* 问题文本：允许长串（编号/URL）换行，避免横向溢出穿模 */
+    .qa-q { flex: 1; min-width: 0; font-size: 15px; font-weight: 600; line-height: 1.45; word-break: break-word; overflow-wrap: anywhere; }
     .qa-qq { color: var(--err); font-weight: 700; }
     .qa-chev { flex: none; color: var(--muted); margin-top: 3px; transition: transform .2s; }
     .qa.open .qa-chev { transform: rotate(180deg); }
     .qa-body { max-height: 0; overflow: hidden; transition: max-height .25s ease; }
     .qa-body-inner { padding: 0 16px 16px 16px; border-top: 1px solid var(--line); margin: 0 0 0 0; }
-    .qa-answer { font-size: 14.5px; color: #374151; padding-top: 12px; }
-    .qa-source { margin-top: 10px; font-size: 12px; color: var(--muted); }
+    /* 答案：保留换行（\n→<br>），长串强制换行，杜绝错位穿模 */
+    .qa-answer {
+      font-size: 14.5px; color: #374151; padding-top: 12px;
+      white-space: pre-wrap; word-break: break-word; overflow-wrap: anywhere;
+    }
+    .qa-source { margin-top: 10px; font-size: 12px; color: var(--muted); word-break: break-word; overflow-wrap: anywhere; }
     .qa-score { margin-left: 8px; font-size: 11px; font-weight: 600; color: #fff; background: var(--warn); border-radius: 999px; padding: 2px 8px; white-space: nowrap; }
 
     .empty { text-align: center; color: var(--muted); padding: 40px 16px; font-size: 14px; }
     .foot { text-align: center; font-size: 12px; color: var(--muted); margin-top: 26px; line-height: 1.7; }
-    .loading { text-align: center; color: var(--muted); padding: 30px 0; font-size: 14px; }
+    .loading { text-align: center; color: var(--muted); padding: 22px 0; font-size: 14px; }
     .err { color: var(--err); }
   </style>
 </head>
@@ -114,6 +119,7 @@
 
     <div class="meta" id="meta"></div>
     <div class="qa-list" id="list"></div>
+    <div id="sentinel" class="loading" hidden>加载更多…</div>
 
     <div class="foot">
       本页面由印章业务信息管理系统提供 · 内容实时整理自 GitHub 归档工作记录<br/>
@@ -123,7 +129,7 @@
 
   <script>
     const $ = (id) => document.getElementById(id)
-    const listEl = $('list'), chipsEl = $('chips'), metaEl = $('meta'), searchEl = $('search')
+    const listEl = $('list'), chipsEl = $('chips'), metaEl = $('meta'), searchEl = $('search'), sentinelEl = $('sentinel')
 
     let ITEMS = []
     let TOPICS = []
@@ -131,6 +137,12 @@
     let liveFlag = false   // 是否来自 Worker 代理（GitHub 实时数据）
     let liveSource = ''    // 实时数据来源标注
     const openSet = new Set()
+
+    // 分批加载：每批渲染数量，触底自动加载下一批，避免一次性渲染全部卡片导致卡顿
+    const BATCH = 20
+    let view = []          // 当前过滤/排序后的完整列表
+    let renderedCount = 0  // 已渲染到列表的条数
+    let loadingBatch = false
 
     // —— 数据来源：Worker 代理 /faq（服务端持 GitHub 令牌拉取并即时整理，令牌不出前端）——
     // FAQ_WORKER_BASE 在 ./faq-config.js 中配置（即本推送 Worker 的部署地址）。
@@ -224,75 +236,94 @@
       return '<svg class="qa-chev" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>'
     }
 
-    function render() {
+    // 计算当前过滤 + 排序后的完整列表（不分页）
+    function computeView() {
       const q = searchEl.value.trim()
       const topicOnly = activeTopic && !q
-
-      let view = ITEMS
+      let v = ITEMS
       if (topicOnly) {
-        view = view.filter((it) => it.topic === activeTopic)
+        v = v.filter((it) => it.topic === activeTopic)
       } else if (q) {
-        view = view
+        v = v
           .map((it) => ({ it, s: scoreItem(it, q) }))
           .filter((x) => x.s > 0)
           .sort((a, b) => b.s - a.s)
           .map((x) => x.it)
       } else {
         const order = Object.fromEntries(TOPICS.map((t, i) => [t, i]))
-        view = [...view].sort((a, b) => {
+        v = [...v].sort((a, b) => {
           const oa = order[a.topic] ?? 99, ob = order[b.topic] ?? 99
           if (oa !== ob) return oa - ob
           return (Number(a.id) || 0) - (Number(b.id) || 0)
         })
       }
+      return v
+    }
 
+    // 单条问答卡片 HTML（根据 openSet 还原展开态）
+    function cardHtml(it) {
+      const q = searchEl.value.trim()
+      const open = openSet.has(String(it.id))
+      const showScore = !!q
+      const score = showScore ? scoreItem(it, q) : 0
+      return (
+        '<div class="qa' + (open ? ' open' : '') + '" data-id="' + escapeHtml(String(it.id)) + '">' +
+          '<button class="qa-head" type="button">' +
+            '<span class="qa-topic">' + escapeHtml(it.topic || '其他') + '</span>' +
+            '<span class="qa-q">' + highlight(it.question, q) + (showScore ? '<span class="qa-score">相关度 ' + Math.round(score) + '</span>' : '') + '</span>' +
+            chevIcon() +
+          '</button>' +
+          '<div class="qa-body' + (open ? ' show' : '') + '"><div class="qa-body-inner">' +
+            '<div class="qa-answer">' + escapeHtml(it.answer || '').replace(/\n/g, '<br>') + '</div>' +
+            (it.source ? '<div class="qa-source">来源：' + escapeHtml(it.source) + (it.status ? ' · ' + escapeHtml(it.status) : '') + '</div>' : '') +
+          '</div></div>' +
+        '</div>'
+      )
+    }
+
+    function renderMeta() {
+      const q = searchEl.value.trim()
+      if (!view.length) { metaEl.innerHTML = ''; return }
       if (q) {
         metaEl.innerHTML = '匹配到 <span class="result-tag">' + view.length + '</span> 条与「' + escapeHtml(q) + '」相关的解答' +
           (view.length ? '（含主题精确匹配与相近主题模糊匹配，已按相关度排序）' : '')
-      } else if (topicOnly) {
+      } else if (activeTopic) {
         metaEl.innerHTML = '主题：<span class="result-tag">' + escapeHtml(activeTopic) + '</span> · 共 ' + view.length + ' 条'
       } else {
-        metaEl.textContent = '共 ' + ITEMS.length + ' 条解答 · 覆盖 ' + TOPICS.length + ' 个主题' +
-          (liveFlag ? ' · ' : '') 
-        if (liveFlag) metaEl.innerHTML = '共 ' + ITEMS.length + ' 条解答 · 覆盖 ' + TOPICS.length + ' 个主题 · <span class="src-tag">' + escapeHtml(liveSource) + '</span>'
+        let s = '共 ' + view.length + ' 条解答 · 覆盖 ' + TOPICS.length + ' 个主题'
+        if (liveFlag) s += ' · <span class="src-tag">' + escapeHtml(liveSource) + '</span>'
+        metaEl.innerHTML = s
       }
+    }
 
+    function updateSentinel() {
+      sentinelEl.hidden = renderedCount >= view.length
+    }
+
+    // 追加下一批卡片（增量，不重建已渲染内容，避免卡顿）
+    function loadMore() {
+      if (renderedCount >= view.length) { updateSentinel(); return }
+      const slice = view.slice(renderedCount, renderedCount + BATCH)
+      const html = slice.map((it) => cardHtml(it)).join('')
+      listEl.insertAdjacentHTML('beforeend', html)
+      renderedCount += slice.length
+      // 还原已展开卡片的高度（scrollHeight 需 DOM 就绪后读取）
+      listEl.querySelectorAll('.qa.open .qa-body').forEach((b) => { b.style.maxHeight = b.scrollHeight + 'px' })
+      updateSentinel()
+    }
+
+    // 重置列表（搜索/主题切换时调用）：清空后首屏渲染一批，剩余由 sentinel 滚动加载
+    function renderReset() {
+      view = computeView()
+      renderMeta()
       if (!view.length) {
         listEl.innerHTML = '<div class="empty">没有找到相关解答，换个关键词试试，或点击上方「去反馈」提交问题。</div>'
+        sentinelEl.hidden = true
         return
       }
-
-      listEl.innerHTML = view.map((it) => {
-        const open = openSet.has(String(it.id))
-        const showScore = !!q
-        const score = showScore ? scoreItem(it, q) : 0
-        return (
-          '<div class="qa' + (open ? ' open' : '') + '" data-id="' + escapeHtml(String(it.id)) + '">' +
-            '<button class="qa-head" type="button">' +
-              '<span class="qa-topic">' + escapeHtml(it.topic || '其他') + '</span>' +
-              '<span class="qa-q">' + highlight(it.question, q) + (showScore ? '<span class="qa-score">相关度 ' + Math.round(score) + '</span>' : '') + '</span>' +
-              chevIcon() +
-            '</button>' +
-            '<div class="qa-body' + (open ? ' show' : '') + '"><div class="qa-body-inner">' +
-              '<div class="qa-answer">' + escapeHtml(it.answer || '').replace(/\n/g, '<br>') + '</div>' +
-              (it.source ? '<div class="qa-source">来源：' + escapeHtml(it.source) + (it.status ? ' · ' + escapeHtml(it.status) : '') + '</div>' : '') +
-            '</div></div>' +
-          '</div>'
-        )
-      }).join('')
-
-      listEl.querySelectorAll('.qa').forEach((el) => {
-        const body = el.querySelector('.qa-body')
-        if (el.classList.contains('open')) body.style.maxHeight = body.scrollHeight + 'px'
-        const head = el.querySelector('.qa-head')
-        head.addEventListener('click', () => {
-          const id = el.getAttribute('data-id')
-          if (openSet.has(id)) openSet.delete(id); else openSet.add(id)
-          el.classList.toggle('open')
-          if (el.classList.contains('open')) body.style.maxHeight = body.scrollHeight + 'px'
-          else body.style.maxHeight = '0px'
-        })
-      })
+      listEl.innerHTML = ''
+      renderedCount = 0
+      loadMore()
     }
 
     function renderChips() {
@@ -307,15 +338,38 @@
           activeTopic = (t === activeTopic) ? '' : t
           if (activeTopic) searchEl.value = ''
           renderChips()
-          render()
+          renderReset()
         })
       })
     }
 
+    // 事件委托：展开/收起（绑定在固定父节点 listEl 上，innerHTML 替换不影响）
+    listEl.addEventListener('click', (e) => {
+      const head = e.target.closest('.qa-head')
+      if (!head) return
+      const qa = head.closest('.qa')
+      const id = qa.getAttribute('data-id')
+      if (openSet.has(id)) openSet.delete(id); else openSet.add(id)
+      qa.classList.toggle('open')
+      const body = qa.querySelector('.qa-body')
+      if (qa.classList.contains('open')) body.style.maxHeight = body.scrollHeight + 'px'
+      else body.style.maxHeight = '0px'
+    })
+
+    // 触底自动加载更多（sentinel 进入视口附近即触发）
+    const io = new IntersectionObserver((entries) => {
+      if (entries[0].isIntersecting && !loadingBatch && renderedCount < view.length) {
+        loadingBatch = true
+        loadMore()
+        loadingBatch = false
+      }
+    }, { root: null, rootMargin: '300px' })
+    io.observe(sentinelEl)
+
     searchEl.addEventListener('input', () => {
       activeTopic = ''
       renderChips()
-      render()
+      renderReset()
     })
 
     ;(async () => {
@@ -323,9 +377,10 @@
         ITEMS = await loadData()
         TOPICS = [...new Set(ITEMS.map((i) => i.topic).filter(Boolean))]
         renderChips()
-        render()
+        renderReset()
       } catch (err) {
         listEl.innerHTML = '<div class="empty err">加载问答数据失败：' + escapeHtml(err.message || err) + '<br/>请确认 faq.json 与本页面同目录，或在 faq-config.js 中配置 FAQ_WORKER_BASE。</div>'
+        sentinelEl.hidden = true
       }
     })()
   </script>
