@@ -36,6 +36,17 @@
     .status.loading { display: block; background: #eff6ff; color: var(--brand); border: 1px solid #bfdbfe; }
     .status.warn { display: block; background: #fffbeb; color: var(--warn); border: 1px solid #fde68a; }
     .foot { text-align: center; font-size: 12px; color: var(--muted); margin-top: 22px; line-height: 1.7; }
+    .backbar { display: flex; justify-content: center; margin: 14px 0 2px; }
+    .ghost-btn {
+      display: inline-flex; align-items: center; gap: 6px;
+      font-size: 14px; font-weight: 600; color: var(--brand);
+      background: #fff; border: 1px solid #dbeafe; border-radius: 999px;
+      padding: 8px 16px; text-decoration: none; transition: background .15s, border-color .15s;
+    }
+    .ghost-btn:hover { background: #eaf1ff; border-color: #bfdbfe; }
+    .ghost-btn:active { background: #dbeafe; }
+    .ghost-btn .arrow { transition: transform .15s; }
+    .ghost-btn:hover .arrow { transform: translateX(2px); }
     .hp { position: absolute; left: -9999px; top: -9999px; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
     .att-hint { margin-top: 7px; font-size: 12.5px; color: var(--muted); min-height: 16px; display: flex; align-items: center; gap: 6px; }
     .att-hint .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--brand); flex: none; }
@@ -49,6 +60,13 @@
       <span class="badge">印章业务 · 在线反馈</span>
       <h1>问题反馈</h1>
       <p>请选择您所在的行政区与企业，填写问题后提交，我们将尽快为您处理。</p>
+    </div>
+
+    <div class="backbar">
+      <a class="ghost-btn" href="faq.html">
+        常见问题解答
+        <span class="arrow">→</span>
+      </a>
     </div>
 
     <div class="card">

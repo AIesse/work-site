@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>问题解答 · 印章业务信息管理系统</title>
+  <meta name="description" content="印章业务常见问题解答：实时整理自 GitHub 归档工作记录，可按主题或相近主题搜索匹配。" />
+  <!-- FAQ 数据配置：设置 FAQ_WORKER_BASE 后，本页经 Worker 代理 /faq 实时拉取并整理问答（令牌仅存于服务端）。
+       未配置（或代理不可用）时回退到同目录预构建 faq.json。 -->
+  <script src="./faq-config.js"></script>
+  <style>
+    :root { --brand: #2563eb; --brand-d: #1d4ed8; --bg: #f4f6fb; --card: #fff; --line: #e5e7eb; --text: #1f2937; --muted: #6b7280; --ok: #059669; --err: #dc2626; --warn: #b45309; }
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    html, body { margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif; background: var(--bg); color: var(--text); line-height: 1.6; }
+    .wrap { max-width: 720px; margin: 0 auto; padding: 20px 16px 56px; }
+    .hero { text-align: center; padding: 22px 0 8px; }
+    .hero .badge { display: inline-block; font-size: 12px; color: var(--brand); background: #eaf1ff; border: 1px solid #dbeafe; border-radius: 999px; padding: 3px 12px; margin-bottom: 10px; }
+    .hero h1 { font-size: 23px; margin: 0 0 8px; letter-spacing: .5px; }
+    .hero p { font-size: 13px; color: var(--muted); margin: 0; }
+
+    .backbar { display: flex; justify-content: center; margin: 14px 0 4px; }
+    .ghost-btn {
+      display: inline-flex; align-items: center; gap: 6px;
+      font-size: 14px; font-weight: 600; color: var(--brand);
+      background: #fff; border: 1px solid #dbeafe; border-radius: 999px;
+      padding: 8px 16px; text-decoration: none; transition: background .15s, border-color .15s;
+    }
+    .ghost-btn:hover { background: #eaf1ff; border-color: #bfdbfe; }
+    .ghost-btn:active { background: #dbeafe; }
+    .ghost-btn .arrow { transition: transform .15s; }
+    .ghost-btn:hover .arrow { transform: translateX(2px); }
+
+    /* 搜索区 */
+    .search-card { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 16px; margin-top: 16px; box-shadow: 0 1px 3px rgba(0,0,0,.05); }
+    .search-box { position: relative; }
+    .search-box svg { position: absolute; left: 13px; top: 50%; transform: translateY(-50%); color: var(--muted); }
+    .search-box input {
+      width: 100%; font-size: 15px; padding: 12px 13px 12px 40px;
+      border: 1px solid var(--line); border-radius: 12px; background: #fff; color: var(--text); outline: none;
+      transition: border-color .15s, box-shadow .15s;
+    }
+    .search-box input:focus { border-color: var(--brand); box-shadow: 0 0 0 3px rgba(37,99,235,.12); }
+    .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+    .chip {
+      font-size: 13px; padding: 6px 13px; border-radius: 999px; cursor: pointer;
+      background: #fff; border: 1px solid var(--line); color: var(--muted); transition: all .15s;
+      user-select: none;
+    }
+    .chip:hover { border-color: #bfdbfe; color: var(--brand); }
+    .chip.active { background: var(--brand); border-color: var(--brand); color: #fff; }
+
+    .meta { text-align: center; font-size: 12.5px; color: var(--muted); margin: 14px 0 4px; }
+    .result-tag { color: var(--brand); font-weight: 600; }
+    .src-tag { color: var(--ok); font-weight: 600; }
+
+    /* 问答列表 */
+    .qa-list { margin-top: 6px; display: flex; flex-direction: column; gap: 12px; }
+    .qa {
+      background: var(--card); border: 1px solid var(--line); border-radius: 14px; overflow: hidden;
+      box-shadow: 0 1px 3px rgba(0,0,0,.04);
+      transition: border-color .15s, box-shadow .15s;
+    }
+    .qa.open { border-color: #bfdbfe; box-shadow: 0 4px 14px rgba(37,99,235,.10); }
+    .qa-head {
+      display: flex; align-items: flex-start; gap: 10px; width: 100%; text-align: left;
+      background: none; border: none; cursor: pointer; padding: 15px 16px; font: inherit; color: var(--text);
+    }
+    .qa-head:active { background: #f8fafc; }
+    .qa-topic {
+      flex: none; font-size: 11.5px; font-weight: 600; color: var(--brand);
+      background: #eaf1ff; border: 1px solid #dbeafe; border-radius: 999px; padding: 3px 9px; margin-top: 2px; white-space: nowrap;
+    }
+    .qa-q { flex: 1; font-size: 15px; font-weight: 600; line-height: 1.45; }
+    .qa-qq { color: var(--err); font-weight: 700; }
+    .qa-chev { flex: none; color: var(--muted); margin-top: 3px; transition: transform .2s; }
+    .qa.open .qa-chev { transform: rotate(180deg); }
+    .qa-body { max-height: 0; overflow: hidden; transition: max-height .25s ease; }
+    .qa-body-inner { padding: 0 16px 16px 16px; border-top: 1px solid var(--line); margin: 0 0 0 0; }
+    .qa-answer { font-size: 14.5px; color: #374151; padding-top: 12px; }
+    .qa-source { margin-top: 10px; font-size: 12px; color: var(--muted); }
+    .qa-score { margin-left: 8px; font-size: 11px; font-weight: 600; color: #fff; background: var(--warn); border-radius: 999px; padding: 2px 8px; white-space: nowrap; }
+
+    .empty { text-align: center; color: var(--muted); padding: 40px 16px; font-size: 14px; }
+    .foot { text-align: center; font-size: 12px; color: var(--muted); margin-top: 26px; line-height: 1.7; }
+    .loading { text-align: center; color: var(--muted); padding: 30px 0; font-size: 14px; }
+    .err { color: var(--err); }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="hero">
+      <span class="badge">印章业务 · 问题解答</span>
+      <h1>问题解答</h1>
+      <p>我们实时整理归档的工作记录为常见问答，支持按主题或相近主题搜索匹配。</p>
+    </div>
+
+    <div class="backbar">
+      <a class="ghost-btn" href="submit.html">
+        遇到问题？去反馈
+        <span class="arrow">→</span>
+      </a>
+    </div>
+
+    <div class="search-card">
+      <div class="search-box">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="11" cy="11" r="7" /><path d="M21 21l-4.3-4.3" />
+        </svg>
+        <input id="search" type="text" placeholder="搜索主题或问题描述，如：备案、调档、缴销、密码…" autocomplete="off" />
+      </div>
+      <div class="chips" id="chips"></div>
+    </div>
+
+    <div class="meta" id="meta"></div>
+    <div class="qa-list" id="list"></div>
+
+    <div class="foot">
+      本页面由印章业务信息管理系统提供 · 内容实时整理自 GitHub 归档工作记录<br/>
+      未找到答案？可点击上方「去反馈」提交您的问题。
+    </div>
+  </div>
+
+  <script>
+    const $ = (id) => document.getElementById(id)
+    const listEl = $('list'), chipsEl = $('chips'), metaEl = $('meta'), searchEl = $('search')
+
+    let ITEMS = []
+    let TOPICS = []
+    let activeTopic = ''   // 当前选中的主题 chip（'' = 全部）
+    let liveFlag = false   // 是否来自 Worker 代理（GitHub 实时数据）
+    let liveSource = ''    // 实时数据来源标注
+    const openSet = new Set()
+
+    // —— 数据来源：Worker 代理 /faq（服务端持 GitHub 令牌拉取并即时整理，令牌不出前端）——
+    // FAQ_WORKER_BASE 在 ./faq-config.js 中配置（即本推送 Worker 的部署地址）。
+    // 未配置（或代理不可用）时回退到同目录预构建 faq.json。
+    const FAQ_WORKER = (window.FAQ_WORKER_BASE || '').replace(/\/+$/, '')
+
+    async function loadData() {
+      if (FAQ_WORKER) {
+        try {
+          const res = await fetch(FAQ_WORKER + '/faq', { cache: 'no-cache' })
+          if (res.ok) {
+            const data = await res.json()
+            const items = Array.isArray(data.items) ? data.items : []
+            if (items.length) {
+              liveFlag = true
+              liveSource = data.source || 'GitHub 实时数据'
+              return items
+            }
+          }
+        } catch (e) {
+          // 代理不可用：落到下方预构建回退
+          console.warn('Worker /faq 拉取失败，回退到预构建 faq.json：', e)
+        }
+      }
+      const res = await fetch('./faq.json', { cache: 'no-cache' })
+      if (!res.ok) throw new Error('HTTP ' + res.status)
+      const data = await res.json()
+      return Array.isArray(data.items) ? data.items : []
+    }
+
+    // —— 文本相似度：中文按 2-gram 切分（短词退化为字符），计算 Jaccard 重叠 ——
+    function grams(s) {
+      s = (s || '').toLowerCase().replace(/\s+/g, '')
+      if (!s) return new Set()
+      if (s.length === 1) return new Set([s])
+      const g = new Set()
+      for (let i = 0; i < s.length - 1; i++) g.add(s.slice(i, i + 2))
+      return g
+    }
+    function jaccard(a, b) {
+      if (!a.size || !b.size) return 0
+      let inter = 0
+      for (const x of a) if (b.has(x)) inter++
+      const union = a.size + b.size - inter
+      return union ? inter / union : 0
+    }
+
+    // 计算单条记录相对于查询的匹配分（0 表示不相关）
+    function scoreItem(item, q) {
+      const ql = q.toLowerCase().trim()
+      if (!ql) return 0
+      const qg = grams(ql)
+      const topic = (item.topic || '').toLowerCase()
+      const kw = (item.keywords || []).map((k) => k.toLowerCase())
+      const question = (item.question || '').toLowerCase()
+      // 评分用的答案去掉结构性标签（处理方式：/跟踪记录：），避免「跟踪」等词因每条都含「跟踪记录：」而泛匹配全部
+      const answerRaw = (item.answer || '')
+      const answerClean = answerRaw.replace(/处理方式：|跟踪记录：/g, '').toLowerCase()
+      const src = (item.source || '').toLowerCase()
+
+      let score = 0
+      // 1) 关键词命中（强信号）：查询包含关键词或关键词包含查询
+      for (const k of kw) {
+        if (!k) continue
+        if (ql.includes(k) || k.includes(ql)) score += 10
+      }
+      // 2) 主题精确命中
+      if (topic && (ql === topic || ql.includes(topic) || topic.includes(ql))) score += 8
+      // 3) 主题/问题 的 bigram 相近度
+      score += jaccard(qg, grams(topic + ' ' + question)) * 6
+      // 4) 查询出现在问题中
+      if (question.includes(ql)) score += 3
+      // 5) 查询出现在答案/来源中（弱信号，用已去标签的干净答案）
+      if (answerClean.includes(ql)) score += 1
+      if (src.includes(ql)) score += 1
+      return score
+    }
+
+    function highlight(text, q) {
+      if (!q) return escapeHtml(text)
+      const idx = text.toLowerCase().indexOf(q.toLowerCase())
+      if (idx < 0) return escapeHtml(text)
+      return escapeHtml(text.slice(0, idx)) +
+        '<span class="qa-qq">' + escapeHtml(text.slice(idx, idx + q.length)) + '</span>' +
+        escapeHtml(text.slice(idx + q.length))
+    }
+    function escapeHtml(s) {
+      return (s || '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]))
+    }
+    function chevIcon() {
+      return '<svg class="qa-chev" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>'
+    }
+
+    function render() {
+      const q = searchEl.value.trim()
+      const topicOnly = activeTopic && !q
+
+      let view = ITEMS
+      if (topicOnly) {
+        view = view.filter((it) => it.topic === activeTopic)
+      } else if (q) {
+        view = view
+          .map((it) => ({ it, s: scoreItem(it, q) }))
+          .filter((x) => x.s > 0)
+          .sort((a, b) => b.s - a.s)
+          .map((x) => x.it)
+      } else {
+        const order = Object.fromEntries(TOPICS.map((t, i) => [t, i]))
+        view = [...view].sort((a, b) => {
+          const oa = order[a.topic] ?? 99, ob = order[b.topic] ?? 99
+          if (oa !== ob) return oa - ob
+          return (Number(a.id) || 0) - (Number(b.id) || 0)
+        })
+      }
+
+      if (q) {
+        metaEl.innerHTML = '匹配到 <span class="result-tag">' + view.length + '</span> 条与「' + escapeHtml(q) + '」相关的解答' +
+          (view.length ? '（含主题精确匹配与相近主题模糊匹配，已按相关度排序）' : '')
+      } else if (topicOnly) {
+        metaEl.innerHTML = '主题：<span class="result-tag">' + escapeHtml(activeTopic) + '</span> · 共 ' + view.length + ' 条'
+      } else {
+        metaEl.textContent = '共 ' + ITEMS.length + ' 条解答 · 覆盖 ' + TOPICS.length + ' 个主题' +
+          (liveFlag ? ' · ' : '') 
+        if (liveFlag) metaEl.innerHTML = '共 ' + ITEMS.length + ' 条解答 · 覆盖 ' + TOPICS.length + ' 个主题 · <span class="src-tag">' + escapeHtml(liveSource) + '</span>'
+      }
+
+      if (!view.length) {
+        listEl.innerHTML = '<div class="empty">没有找到相关解答，换个关键词试试，或点击上方「去反馈」提交问题。</div>'
+        return
+      }
+
+      listEl.innerHTML = view.map((it) => {
+        const open = openSet.has(String(it.id))
+        const showScore = !!q
+        const score = showScore ? scoreItem(it, q) : 0
+        return (
+          '<div class="qa' + (open ? ' open' : '') + '" data-id="' + escapeHtml(String(it.id)) + '">' +
+            '<button class="qa-head" type="button">' +
+              '<span class="qa-topic">' + escapeHtml(it.topic || '其他') + '</span>' +
+              '<span class="qa-q">' + highlight(it.question, q) + (showScore ? '<span class="qa-score">相关度 ' + Math.round(score) + '</span>' : '') + '</span>' +
+              chevIcon() +
+            '</button>' +
+            '<div class="qa-body' + (open ? ' show' : '') + '"><div class="qa-body-inner">' +
+              '<div class="qa-answer">' + escapeHtml(it.answer || '').replace(/\n/g, '<br>') + '</div>' +
+              (it.source ? '<div class="qa-source">来源：' + escapeHtml(it.source) + (it.status ? ' · ' + escapeHtml(it.status) : '') + '</div>' : '') +
+            '</div></div>' +
+          '</div>'
+        )
+      }).join('')
+
+      listEl.querySelectorAll('.qa').forEach((el) => {
+        const body = el.querySelector('.qa-body')
+        if (el.classList.contains('open')) body.style.maxHeight = body.scrollHeight + 'px'
+        const head = el.querySelector('.qa-head')
+        head.addEventListener('click', () => {
+          const id = el.getAttribute('data-id')
+          if (openSet.has(id)) openSet.delete(id); else openSet.add(id)
+          el.classList.toggle('open')
+          if (el.classList.contains('open')) body.style.maxHeight = body.scrollHeight + 'px'
+          else body.style.maxHeight = '0px'
+        })
+      })
+    }
+
+    function renderChips() {
+      const all = ['全部', ...TOPICS]
+      chipsEl.innerHTML = all.map((t) => {
+        const active = (t === '全部' && !activeTopic) || t === activeTopic
+        return '<span class="chip' + (active ? ' active' : '') + '" data-topic="' + escapeHtml(t === '全部' ? '' : t) + '">' + escapeHtml(t) + '</span>'
+      }).join('')
+      chipsEl.querySelectorAll('.chip').forEach((c) => {
+        c.addEventListener('click', () => {
+          const t = c.getAttribute('data-topic')
+          activeTopic = (t === activeTopic) ? '' : t
+          if (activeTopic) searchEl.value = ''
+          renderChips()
+          render()
+        })
+      })
+    }
+
+    searchEl.addEventListener('input', () => {
+      activeTopic = ''
+      renderChips()
+      render()
+    })
+
+    ;(async () => {
+      try {
+        ITEMS = await loadData()
+        TOPICS = [...new Set(ITEMS.map((i) => i.topic).filter(Boolean))]
+        renderChips()
+        render()
+      } catch (err) {
+        listEl.innerHTML = '<div class="empty err">加载问答数据失败：' + escapeHtml(err.message || err) + '<br/>请确认 faq.json 与本页面同目录，或在 faq-config.js 中配置 FAQ_WORKER_BASE。</div>'
+      }
+    })()
+  </script>
+</body>
+</html>
