@@ -52,6 +52,18 @@
     .att-hint .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--brand); flex: none; }
     .att-hint .x { margin-left: auto; color: var(--err); cursor: pointer; font-weight: 600; padding: 0 4px; }
     .att-hint .x:hover { text-decoration: underline; }
+
+    /* 提交成功后的「事项编码」卡片：醒目展示，提示保存并附进度查询入口 */
+    .code-card { margin-top: 16px; padding: 18px 16px; border-radius: 14px; background: #f0f7ff; border: 1px solid #bfdbfe; text-align: center; }
+    .code-card .cc-label { font-size: 13px; color: var(--muted); }
+    .code-card .cc-value { font-size: 30px; font-weight: 700; letter-spacing: 4px; color: var(--brand); margin: 8px 0 4px; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; word-break: break-all; }
+    .code-card .cc-tip { font-size: 13px; color: var(--warn); margin-bottom: 14px; line-height: 1.5; }
+    .code-card .cc-actions { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+    .code-card button.copy { background: #fff; border: 1px solid #bfdbfe; color: var(--brand); border-radius: 999px; padding: 9px 18px; font-size: 14px; font-weight: 600; cursor: pointer; transition: background .15s; }
+    .code-card button.copy:active { background: #eaf1ff; }
+    .code-card a.qbtn { display: inline-flex; align-items: center; gap: 6px; background: var(--brand); color: #fff; border-radius: 999px; padding: 9px 18px; font-size: 14px; font-weight: 600; text-decoration: none; transition: background .15s; }
+    .code-card a.qbtn:hover { background: var(--brand-d); }
+    .code-card a.qbtn:active { background: var(--brand-d); }
   </style>
 </head>
 <body>
@@ -116,6 +128,17 @@
         <div class="rate-hint" id="rateHint"></div>
 
         <div class="status" id="status"></div>
+
+        <!-- 提交成功后展示的事项编码卡片（默认隐藏，成功时填充并显隐） -->
+        <div class="code-card" id="codeCard" style="display:none">
+          <div class="cc-label">您的事项编码</div>
+          <div class="cc-value" id="ccValue"></div>
+          <div class="cc-tip">请妥善保存此编码，凭它可在「进度查询」页随时查询处理进度。</div>
+          <div class="cc-actions">
+            <button type="button" class="copy" id="ccCopy">复制编码</button>
+            <a class="qbtn" id="ccQuery" href="progress-query.html">前往进度查询 →</a>
+          </div>
+        </div>
       </form>
     </div>
 
@@ -156,6 +179,30 @@
       if (clear) clear.addEventListener('click', () => { attachmentEl.value = ''; renderAttHint() })
     }
     attachmentEl.addEventListener('change', renderAttHint)
+
+    // 复制事项编码：写入剪贴板并短暂反馈
+    const ccCopy = $('ccCopy')
+    if (ccCopy) {
+      ccCopy.addEventListener('click', async () => {
+        const code = $('ccValue').textContent || ''
+        if (!code) return
+        try {
+          if (navigator.clipboard && navigator.clipboard.writeText) {
+            await navigator.clipboard.writeText(code)
+          } else {
+            const ta = document.createElement('textarea')
+            ta.value = code; ta.style.position = 'fixed'; ta.style.opacity = '0'
+            document.body.appendChild(ta); ta.select(); document.execCommand('copy'); document.body.removeChild(ta)
+          }
+          const old = ccCopy.textContent
+          ccCopy.textContent = '已复制 ✓'
+          setTimeout(() => { ccCopy.textContent = old }, 1500)
+        } catch {
+          ccCopy.textContent = '复制失败'
+          setTimeout(() => { ccCopy.textContent = '复制编码' }, 1500)
+        }
+      })
+    }
 
     let ENTERPRISES = []
     let cooldownTimer = null
@@ -216,6 +263,31 @@
       let max = 0
       for (const r of rows) { const v = Number(r.id); if (!Number.isNaN(v) && v > max) max = v }
       return max + 1
+    }
+
+    // 生成 6 位「英文 + 数字」混搭的唯一事项编码：
+    // - 字母池排除易混淆的 I/O，数字池排除 0/1，降低客户抄写错误；
+    // - 强制至少包含 1 个字母与 1 个数字（"混搭"）；
+    // - 与现有记录的 matter_code 去重，保证唯一。
+    const CODE_LETTERS = 'ABCDEFGHJKLMNPQRSTUVWXYZ'
+    const CODE_DIGITS = '23456789'
+    function genMatterCode(rows) {
+      const pool = CODE_LETTERS + CODE_DIGITS
+      const existing = new Set((rows || []).map((r) => String(r.matter_code || '').toUpperCase()).filter(Boolean))
+      for (let attempt = 0; attempt < 200; attempt++) {
+        let code = ''
+        for (let i = 0; i < 6; i++) code += pool[Math.floor(Math.random() * pool.length)]
+        const hasLetter = /[A-Z]/.test(code)
+        const hasDigit = /[0-9]/.test(code)
+        if (!hasLetter || !hasDigit) continue // 必须字母数字混搭
+        if (existing.has(code)) continue // 必须唯一
+        return code
+      }
+      // 极端兜底：强制 3 字母 + 3 数字随机排列，并加随机后缀重试（理论上不可达）
+      let code = 'EP'
+      for (let i = 0; i < 4; i++) code += pool[Math.floor(Math.random() * pool.length)]
+      while (existing.has(code)) code += CODE_DIGITS[Math.floor(Math.random() * CODE_DIGITS.length)]
+      return code
     }
 
     async function putInbox(token, rows, sha, rec, attempt = 0) {
@@ -305,6 +377,9 @@
 
     formEl.addEventListener('submit', async (e) => {
       e.preventDefault()
+      // 开始新的提交：收起上一次可能展示的编码卡片
+      const ccHide = $('codeCard')
+      if (ccHide) ccHide.style.display = 'none'
       // 蜜罐命中：疑似机器人，直接拒绝（不落库）。
       if (hpEl.value.trim()) { setStatus('err', '提交失败，请稍后重试。'); return }
 
@@ -358,6 +433,7 @@
 
         const rec = {
           id: nextId(rows),
+          matter_code: genMatterCode(rows),
           district,
           company_name,
           company_code: code,
@@ -379,6 +455,9 @@
           ? '问题已提交成功，但附件上传失败' + (attErr ? '（' + attErr + '）' : '') + '，未随附附件。'
           : (attachment ? '提交成功！我们已收到您的问题及附件，将尽快处理。' : '提交成功！我们已收到您的问题，将尽快处理。')
         setStatus('ok', okMsg)
+        // 展示事项编码卡片：提示客户妥善保存，凭此编码可查询进度
+        const cc = $('codeCard'), ccVal = $('ccValue')
+        if (cc && ccVal) { ccVal.textContent = rec.matter_code; cc.style.display = 'block' }
         contactEl.value = ''; phoneEl.value = ''; contentEl.value = ''
         attHint.innerHTML = ''
         attachmentEl.value = ''

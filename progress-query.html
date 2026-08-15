@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<title>事项进度查询 · 印章业务信息管理系统</title>
+<script src="./faq-config.js"></script>
+<style>
+  :root {
+    --bg-primary: #f9fafb;
+    --card-bg: rgba(255, 255, 255, 0.8);
+    --text-primary: #1f2937;
+    --text-secondary: #6b7280;
+    --border-color: rgba(209, 213, 219, 0.7);
+    --input-bg: #f9fafb;
+    --brand: #3b82f6;
+    --brand-hover: #2563eb;
+    --ok: #059669;
+    --warn: #d97706;
+    --err: #dc2626;
+    --app-font: 'AlimamaFangYuanTiVF', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', 'Hiragino Sans GB', sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg-primary: #000000;
+      --card-bg: rgba(17, 17, 17, 0.85);
+      --text-primary: #ffffff;
+      --text-secondary: #b0b0b0;
+      --border-color: rgba(255, 255, 255, 0.1);
+      --input-bg: #000000;
+      --brand: #3b82f6;
+      --brand-hover: #2563eb;
+      --ok: #10b981;
+      --warn: #f59e0b;
+      --err: #f87171;
+    }
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    font-family: var(--app-font);
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .wrap { max-width: 680px; margin: 0 auto; padding: 20px 16px 48px; }
+
+  .page-head { display: flex; align-items: center; gap: 12px; padding: 6px 2px 16px; }
+  .page-head .logo { flex: none; width: 44px; height: 44px; border-radius: 9999px; display: flex; align-items: center; justify-content: center; background: var(--brand); color: #fff; font-size: 22px; }
+  .page-head h1 { margin: 0; font-size: 19px; font-weight: 600; }
+  .page-head p { margin: 2px 0 0; font-size: 12px; color: var(--text-secondary); }
+
+  .back { display: inline-flex; align-items: center; justify-content: center; margin-top: 4px; padding: 4px 12px; border-radius: 9999px; font-size: 12px; font-weight: 500; text-decoration: none; color: var(--text-primary); background: rgba(17, 24, 39, 0.06); }
+  .back:hover { background: rgba(17, 24, 39, 0.12); }
+  .dark .back, .dark .back:hover { background: rgba(255, 255, 255, 0.10); }
+  .dark .back:hover { background: rgba(255, 255, 255, 0.18); }
+
+  .card { background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 1rem; padding: 18px; margin-top: 16px; -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); }
+
+  label { display: block; font-size: 13px; font-weight: 500; color: var(--text-secondary); margin: 0 0 8px; }
+  input[type=text] { width: 100%; padding: 12px 14px; font-size: 16px; letter-spacing: 2px; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; border: 1px solid var(--border-color); border-radius: 0.75rem; background: var(--input-bg); color: var(--text-primary); outline: none; transition: border-color .15s ease; text-transform: uppercase; }
+  input[type=text]:focus { border-color: var(--brand); }
+
+  button.query { width: 100%; margin-top: 16px; padding: 12px; font-size: 15px; font-weight: 600; font-family: inherit; color: #fff; background: var(--brand); border: none; border-radius: 999px; cursor: pointer; transition: background .15s ease; }
+  button.query:hover { background: var(--brand-hover); }
+  button.query:disabled { opacity: .6; cursor: default; }
+
+  .msg { margin-top: 14px; padding: 11px 13px; border-radius: 0.75rem; font-size: 14px; }
+  .msg.err { background: rgba(220,38,38,.08); color: var(--err); border: 1px solid rgba(220,38,38,.25); }
+  .msg.warn { background: rgba(217,119,6,.08); color: var(--warn); border: 1px solid rgba(217,119,6,.25); }
+
+  .spinner { width: 22px; height: 22px; margin: 18px auto; border: 3px solid var(--border-color); border-top-color: var(--brand); border-radius: 50%; animation: spin .8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .result { margin-top: 16px; }
+  .result h2 { font-size: 16px; margin: 0 0 10px; font-weight: 600; }
+
+  .code-badge { display: inline-block; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 22px; font-weight: 700; letter-spacing: 3px; color: var(--brand); padding: 6px 14px; border: 1px solid var(--border-color); border-radius: 0.75rem; margin-bottom: 12px; }
+
+  .row { display: flex; gap: 12px; padding: 9px 0; border-bottom: 1px solid var(--border-color); font-size: 14px; }
+  .row:last-child { border-bottom: none; }
+  .row .k { width: 96px; flex-shrink: 0; color: var(--text-secondary); }
+  .row .v { flex: 1; word-break: break-word; white-space: pre-wrap; }
+  .v.ok { color: var(--ok); font-weight: 600; }
+  .v.warnc { color: var(--warn); font-weight: 600; }
+  .v.bad { color: var(--err); font-weight: 600; }
+
+  .section-title { margin: 18px 0 6px; font-size: 14px; font-weight: 600; color: var(--text-primary); }
+
+  /* 跟踪进度时间线 */
+  .timeline { margin-top: 6px; padding-left: 4px; }
+  .tl-item { position: relative; padding: 0 0 14px 22px; border-left: 2px solid var(--border-color); }
+  .tl-item:last-child { border-left-color: transparent; padding-bottom: 0; }
+  .tl-item::before { content: ''; position: absolute; left: -7px; top: 2px; width: 12px; height: 12px; border-radius: 50%; background: var(--brand); border: 2px solid var(--bg-primary); }
+  .tl-time { font-size: 12px; color: var(--text-secondary); margin-bottom: 2px; }
+  .tl-content { font-size: 14px; word-break: break-word; white-space: pre-wrap; }
+
+  .empty-note { margin-top: 10px; font-size: 13.5px; color: var(--text-secondary); background: rgba(17,24,39,.04); padding: 10px 12px; border-radius: 0.75rem; }
+  .dark .empty-note { background: rgba(255,255,255,.06); }
+
+  .foot { margin-top: 20px; font-size: 12px; color: var(--text-secondary); text-align: center; line-height: 1.7; }
+  .foot a { color: var(--brand); text-decoration: none; }
+  .foot a:hover { text-decoration: underline; }
+
+  .banner { margin-top: 16px; padding: 11px 13px; border-radius: 0.75rem; font-size: 13px; background: rgba(217,119,6,.08); color: var(--warn); border: 1px solid rgba(217,119,6,.25); }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="page-head">
+      <div class="logo">📋</div>
+      <div style="flex:1">
+        <h1>事项进度查询</h1>
+        <p>输入提交问题时获得的事项编码，查询处理进度</p>
+      </div>
+      <a class="back" href="./submit.html">← 返回提交</a>
+    </div>
+
+    <div class="card">
+      <label for="codeInput">事项编码</label>
+      <input type="text" id="codeInput" placeholder="例如 A7K2P9" autocomplete="off" maxlength="12" />
+
+      <button class="query" id="queryBtn" onclick="doQuery()">查询进度</button>
+
+      <div id="banner" class="banner" style="display:none"></div>
+      <div id="loading" class="spinner" style="display:none"></div>
+      <div id="msg"></div>
+      <div id="result" class="result"></div>
+    </div>
+
+    <div class="foot">
+      本查询仅展示该事项的处理情况与跟踪进度，不涉及您的联系方式等隐私信息。<br/>
+      若忘记事项编码，请联系提交时对应的经办人员核实。
+    </div>
+  </div>
+
+<script>
+  const FAQ_WORKER = (window.FAQ_WORKER_BASE || '').replace(/\/+$/, '')
+
+  function escapeHtml(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]))
+  }
+
+  // 状态着色：与系统内状态语义一致
+  function statusColor(s) {
+    if (!s) return ''
+    if (['已办结', '已归档'].includes(s)) return 'ok'
+    if (['处理中', '已受理'].includes(s)) return 'warnc'
+    if (['待处理', '已退回', '审批驳回'].includes(s)) return 'bad'
+    return ''
+  }
+
+  function fmtTime(t) {
+    if (!t) return ''
+    // 兼容 ISO 与 yyyy-MM-ddTHH:mm 等多种格式，仅展示到分钟
+    const d = new Date(t)
+    if (isNaN(d.getTime())) return String(t)
+    const pad = (n) => String(n).padStart(2, '0')
+    return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes())
+  }
+
+  function showMsg(type, text) {
+    const m = document.getElementById('msg')
+    m.className = 'msg ' + type
+    m.textContent = text
+  }
+
+  function renderResult(d) {
+    const box = document.getElementById('result')
+    const colorCls = statusColor(d.status) || statusColor(d.work_status)
+    let html = '<h2>事项处理情况</h2>'
+    html += '<div class="code-badge">' + escapeHtml(d.matter_code) + '</div>'
+
+    const infoRows = [
+      ['当前状态', d.status || '—', statusColor(d.status)],
+      ['问题类型', d.type || '—', ''],
+      ['企业名称', d.company_name || '—', ''],
+      ['行政区', d.district || '—', ''],
+      ['提交时间', fmtTime(d.created_at) || '—', ''],
+    ]
+    for (const [k, v, c] of infoRows) {
+      html += '<div class="row"><div class="k">' + k + '</div><div class="v ' + c + '">' + escapeHtml(v) + '</div></div>'
+    }
+    // 问题描述
+    html += '<div class="row"><div class="k">问题描述</div><div class="v">' + (d.content ? escapeHtml(d.content) : '—') + '</div></div>'
+
+    // 处理方式
+    html += '<div class="section-title">处理方式</div>'
+    if (d.handling_method) {
+      html += '<div class="row"><div class="k">处理方式</div><div class="v">' + escapeHtml(d.handling_method) + '</div></div>'
+    } else {
+      html += '<div class="empty-note">' + (d.started ? '暂未填写处理方式。' : '该事项尚未开始处理，暂无处理方式。') + '</div>'
+    }
+
+    // 跟踪进度
+    html += '<div class="section-title">跟踪进度</div>'
+    if (d.tracks && d.tracks.length) {
+      html += '<div class="timeline">'
+      for (const t of d.tracks) {
+        html += '<div class="tl-item"><div class="tl-time">' + escapeHtml(fmtTime(t.record_time)) + '</div><div class="tl-content">' + escapeHtml(t.content) + '</div></div>'
+      }
+      html += '</div>'
+    } else {
+      html += '<div class="empty-note">' + (d.started ? '暂无跟踪记录。' : '该事项尚未开始处理，暂无跟踪进度。') + '</div>'
+    }
+
+    box.innerHTML = html
+  }
+
+  async function doQuery() {
+    const code = document.getElementById('codeInput').value.trim().toUpperCase()
+    const msg = document.getElementById('msg')
+    const loading = document.getElementById('loading')
+    const result = document.getElementById('result')
+    msg.textContent = ''; msg.className = 'msg'
+    result.innerHTML = ''
+
+    if (!code) { showMsg('err', '请输入事项编码'); return }
+    if (!FAQ_WORKER) { showMsg('err', '查询服务未配置，请联系管理员。'); return }
+
+    loading.style.display = 'block'
+    try {
+      const res = await fetch(FAQ_WORKER + '/progress?code=' + encodeURIComponent(code), { cache: 'no-cache' })
+      const text = await res.text()
+      let data = null
+      try { data = JSON.parse(text) } catch {}
+      loading.style.display = 'none'
+      if (!res.ok) { showMsg('err', '查询请求失败（HTTP ' + res.status + '）'); return }
+      if (data && data.found) {
+        renderResult(data)
+      } else if (data && data.reason === 'not_found') {
+        showMsg('warn', '未查询到该事项编码对应的记录，请核对编码是否正确（区分大小写，仅含字母与数字）。')
+      } else {
+        showMsg('err', '查询失败，请稍后重试。')
+      }
+    } catch (e) {
+      loading.style.display = 'none'
+      showMsg('err', '网络错误，请稍后重试。')
+    }
+  }
+
+  // 回车即查询
+  document.getElementById('codeInput').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') doQuery()
+  })
+
+  // HTTPS 下浏览器会拦截对 http 接口的混内容；本查询走同源 Worker（https），一般无此问题，
+  // 但提示仍保留以防 Worker 仅 http 部署。
+  if (location.protocol === 'https:' && FAQ_WORKER && FAQ_WORKER.indexOf('https://') !== 0) {
+    const b = document.getElementById('banner')
+    b.style.display = 'block'
+    b.textContent = '提示：当前为 HTTPS 安全环境，查询服务需为 HTTPS 地址，否则浏览器会拦截请求。'
+  }
+</script>
+</body>
+</html>
