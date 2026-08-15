@@ -324,9 +324,9 @@
     }
   }
 
-  // HTTPS / PWA 安全上下文下，浏览器会拦截对 http:// 接口的「混合内容」请求；
-  // 本页为独立页面，可在本机 http:// 环境直接打开以绕过该限制。
-  if (window.isSecureContext) {
+  // 仅当页面本身通过 https:// 加载时，浏览器才会拦截对 http:// 接口的「混合内容」请求；
+  // 本页以独立 http:// 页面打开时（本机/局域网 HTTP 服务）不受此限制，无需提示。
+  if (location.protocol === 'https:') {
     const b = document.getElementById('banner')
     b.style.display = 'block'
     b.textContent = '提示：当前为 HTTPS 安全环境，浏览器会禁止混合内容访问（无法直连外部 HTTP 接口）。如需查询，请在本机 http:// 环境打开本页，或待接口提供 HTTPS 后使用。'
