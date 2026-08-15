@@ -5,7 +5,7 @@
 // 使浏览器能检测到「有新版本」。新版就绪后**不再由 SW 自行强制刷新页面**，
 // 而是等待前端 main.jsx 发送 SKIP_WAITING，由前端在「更新进度提示」中平滑接管并重启，
 // 避免无提示的突然刷新、并能在更新时向用户展示进度。
-const SW_VERSION = '1786805076415'
+const SW_VERSION = '1786805918469'
 const CACHE = 'ep-shell-v3'
 const APP_SHELL = ['./', './index.html']
 
@@ -117,6 +117,23 @@ self.addEventListener('fetch', (event) => {
           return res
         })
         .catch(() => caches.match('./index.html').then((r) => r || caches.match('./')))
+    )
+    return
+  }
+
+  // Service Worker 自身（sw.js）：network-first，确保①读取版本号(getCurrentVersion)
+  // 能拿到线上最新文本、②SW 自身更新不被旧缓存卡住；离线时回退已缓存版本。
+  if (url.pathname.endsWith('/sw.js')) {
+    event.respondWith(
+      fetch(req)
+        .then((res) => {
+          if (res && res.status === 200) {
+            const copy = res.clone()
+            caches.open(CACHE).then((c) => c.put(req, copy))
+          }
+          return res
+        })
+        .catch(() => caches.match(req))
     )
     return
   }
