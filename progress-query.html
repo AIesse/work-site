@@ -177,8 +177,6 @@
     const infoRows = [
       ['当前状态', d.status || '—', statusColor(d.status)],
       ['问题类型', d.type || '—', ''],
-      ['企业名称', d.company_name || '—', ''],
-      ['行政区', d.district || '—', ''],
       ['提交时间', fmtTime(d.created_at) || '—', ''],
     ]
     for (const [k, v, c] of infoRows) {
