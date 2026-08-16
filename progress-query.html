@@ -106,6 +106,14 @@
   .foot a:hover { text-decoration: underline; }
 
   .banner { margin-top: 16px; padding: 11px 13px; border-radius: 0.75rem; font-size: 13px; background: rgba(217,119,6,.08); color: var(--warn); border: 1px solid rgba(217,119,6,.25); }
+
+  /* 附件展示：图片缩略图 + 其他文件链接 */
+  .section-title + .att-grid { margin-top: 2px; }
+  .att-grid { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+  .att-thumb { display: block; width: 84px; height: 84px; border-radius: 10px; overflow: hidden; border: 1px solid var(--border-color); background: rgba(0,0,0,.03); }
+  .att-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .att-file { display: inline-flex; align-items: center; max-width: 100%; padding: 7px 11px; border-radius: 10px; font-size: 13px; text-decoration: none; color: var(--brand); background: rgba(59,130,246,.08); border: 1px solid rgba(59,130,246,.25); word-break: break-all; }
+  .att-empty { margin-top: 8px; font-size: 13px; color: var(--text-secondary); }
 </style>
 </head>
 <body>
@@ -162,6 +170,37 @@
     return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes())
   }
 
+  // 从附件 URL 解析出文件名（优先取 ?name= 参数，否则取路径末段）
+  function attFileName(u) {
+    try {
+      const p = new URL(u)
+      const n = p.searchParams.get('name')
+      if (n) return n
+      const seg = p.pathname.split('/').pop()
+      return seg || u
+    } catch { return u }
+  }
+  const IMG_RE = /\.(png|jpe?g|gif|webp|bmp)$/i
+
+  // 把附件数组渲染为缩略图（图片）或文件链接（其它），经 Worker /file 代理加载（免令牌）
+  function renderAtts(atts) {
+    if (!atts || !atts.length) return ''
+    let html = '<div class="att-grid">'
+    for (const u of atts) {
+      if (!u) continue
+      const name = attFileName(u)
+      const isImg = IMG_RE.test(name)
+      const purl = FAQ_WORKER + '/file?url=' + encodeURIComponent(u)
+      if (isImg) {
+        html += '<a class="att-thumb" href="' + escapeHtml(purl) + '" target="_blank" rel="noopener" title="' + escapeHtml(name) + '"><img src="' + escapeHtml(purl) + '" alt="' + escapeHtml(name) + '" loading="lazy" /></a>'
+      } else {
+        html += '<a class="att-file" href="' + escapeHtml(purl) + '" target="_blank" rel="noopener" title="' + escapeHtml(name) + '">📎 ' + escapeHtml(name) + '</a>'
+      }
+    }
+    html += '</div>'
+    return html
+  }
+
   function showMsg(type, text) {
     const m = document.getElementById('msg')
     m.className = 'msg ' + type
@@ -184,6 +223,11 @@
     }
     // 问题描述
     html += '<div class="row"><div class="k">问题描述</div><div class="v">' + (d.content ? escapeHtml(d.content) : '—') + '</div></div>'
+    // 事项信息附件
+    html += '<div class="section-title">事项附件</div>'
+    html += (d.attachments && d.attachments.length)
+      ? renderAtts(d.attachments)
+      : '<div class="att-empty">暂无附件</div>'
 
     // 处理方式
     html += '<div class="section-title">处理方式</div>'
@@ -198,7 +242,10 @@
     if (d.tracks && d.tracks.length) {
       html += '<div class="timeline">'
       for (const t of d.tracks) {
-        html += '<div class="tl-item"><div class="tl-time">' + escapeHtml(fmtTime(t.record_time)) + '</div><div class="tl-content">' + escapeHtml(t.content) + '</div></div>'
+        let item = '<div class="tl-item"><div class="tl-time">' + escapeHtml(fmtTime(t.record_time)) + '</div><div class="tl-content">' + escapeHtml(t.content) + '</div>'
+        if (t.attachments && t.attachments.length) item += renderAtts(t.attachments)
+        item += '</div>'
+        html += item
       }
       html += '</div>'
     } else {

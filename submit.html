@@ -158,6 +158,9 @@
     // 频次防护：同一浏览器每分钟仅允许提交一次（基于本地时间戳，刷新后仍生效）。
     const COOLDOWN_MS = 60 * 1000
     const LAST_KEY = 'inbox_last_submit_ts'
+    // 附件大小上限：3MB，超出提示并阻止提交。
+    const MAX_ATT_BYTES = 3 * 1024 * 1024
+    let attOversize = false
 
     const $ = (id) => document.getElementById(id)
     const districtSel = $('district'), companySel = $('company')
@@ -172,13 +175,22 @@
       if (n < 1024 * 1024) return (n / 1024).toFixed(1) + ' KB'
       return (n / 1024 / 1024).toFixed(2) + ' MB'
     }
-    // 选中附件后即时显示文件名/大小，便于确认已选。
+    // 选中附件后即时显示文件名/大小，便于确认已选；超出 3MB 时给出醒目警示。
     function renderAttHint() {
       const f = attachmentEl.files && attachmentEl.files[0]
-      if (!f) { attHint.innerHTML = ''; return }
-      attHint.innerHTML =
-        '<span class="dot"></span><span>' + f.name + '（' + fmtSize(f.size) + '）</span>' +
-        '<span class="x" id="attClear" title="移除附件">✕</span>'
+      if (!f) { attHint.innerHTML = ''; attOversize = false; return }
+      const oversize = f.size > MAX_ATT_BYTES
+      attOversize = oversize
+      if (oversize) {
+        attHint.innerHTML =
+          '<span class="dot" style="background:var(--err)"></span>' +
+          '<span style="color:var(--err)">' + f.name + '（' + fmtSize(f.size) + '）超出 3MB 限制</span>' +
+          '<span class="x" id="attClear" title="移除附件">✕</span>'
+      } else {
+        attHint.innerHTML =
+          '<span class="dot"></span><span>' + f.name + '（' + fmtSize(f.size) + '）</span>' +
+          '<span class="x" id="attClear" title="移除附件">✕</span>'
+      }
       const clear = $('attClear')
       if (clear) clear.addEventListener('click', () => { attachmentEl.value = ''; renderAttHint() })
     }
@@ -407,6 +419,13 @@
       if (!district || !code) { setStatus('err', '请选择行政区与企业'); return }
       if (!contact_person || !contact_phone) { setStatus('err', '请填写联系人与联系电话'); return }
       if (!content) { setStatus('err', '请填写问题内容'); return }
+
+      // 附件大小校验：超出 3MB 直接拦截，提示压缩后重试
+      const pendingFile = attachmentEl.files && attachmentEl.files[0]
+      if (pendingFile && pendingFile.size > MAX_ATT_BYTES) {
+        setStatus('err', '附件大小不能超过 3MB（当前 ' + fmtSize(pendingFile.size) + '），请压缩或移除后重试。')
+        return
+      }
 
       submitBtn.disabled = true
       setStatus('loading', '正在提交…')
