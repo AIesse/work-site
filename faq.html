@@ -149,7 +149,23 @@
     // 未配置（或代理不可用）时回退到同目录预构建 faq.json。
     const FAQ_WORKER = (window.FAQ_WORKER_BASE || '').replace(/\/+$/, '')
 
+    // 加载策略：本地 ./faq.json 优先（随站点公开部署，国内直连，无需翻墙、不依赖被墙的
+    // *.workers.dev）。仅当本地 faq.json 缺失/为空时，才回退到 Worker 代理 /faq（服务端持令牌实时整理）。
+    // 注意：进度查询页(progress-query.html)仍独立使用 FAQ_WORKER_BASE 调 /progress，此处改动不影响它。
     async function loadData() {
+      try {
+        const res = await fetch('./faq.json', { cache: 'no-cache' })
+        if (res.ok) {
+          const data = await res.json()
+          const items = Array.isArray(data.items) ? data.items : []
+          if (items.length) {
+            liveFlag = false
+            return items
+          }
+        }
+      } catch (e) {
+        console.warn('本地 faq.json 读取失败，尝试 Worker 兜底：', e)
+      }
       if (FAQ_WORKER) {
         try {
           const res = await fetch(FAQ_WORKER + '/faq', { cache: 'no-cache' })
@@ -163,14 +179,10 @@
             }
           }
         } catch (e) {
-          // 代理不可用：落到下方预构建回退
-          console.warn('Worker /faq 拉取失败，回退到预构建 faq.json：', e)
+          console.warn('Worker /faq 拉取失败：', e)
         }
       }
-      const res = await fetch('./faq.json', { cache: 'no-cache' })
-      if (!res.ok) throw new Error('HTTP ' + res.status)
-      const data = await res.json()
-      return Array.isArray(data.items) ? data.items : []
+      throw new Error('本地 faq.json 与 Worker 代理均不可用')
     }
 
     // —— 文本相似度：中文按 2-gram 切分（短词退化为字符），计算 Jaccard 重叠 ——
