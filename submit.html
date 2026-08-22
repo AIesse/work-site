@@ -153,8 +153,16 @@
   </div>
 
   <script>
-    const API = 'https://api.github.com'
-    const REPO = window.INBOX_REPO || { owner: 'AIesse', name: 'inbox', branch: 'main', file: 'inbox.json' }
+    // ===== 双源配置（Gitee 默认 + GitHub 兜底，由 inbox-config.js 注入）=====
+    //   INBOX_SOURCE = 'gitee' | 'github'：主源（默认 gitee，国内访问快）
+    //   主源失败时自动回退另一源，保证提交链路可用
+    const GH_API = 'https://api.github.com'
+    const GITEE_API = 'https://gitee.com/api/v5'
+    const GH_REPO = window.INBOX_REPO || { owner: 'AIesse', name: 'inbox', branch: 'main', file: 'inbox.json' }
+    const GITEE_REPO = window.GITEE_INBOX_REPO || { owner: 'aiesse', name: 'inbox', branch: 'main', file: 'inbox.json' }
+    const GH_TOKEN = window.INBOX_TOKEN || ''
+    const GITEE_TOKEN = window.GITEE_INBOX_TOKEN || ''
+    const PRIMARY_SOURCE = window.INBOX_SOURCE === 'github' ? 'github' : 'gitee'
     // 频次防护：同一浏览器每分钟仅允许提交一次（基于本地时间戳，刷新后仍生效）。
     const COOLDOWN_MS = 60 * 1000
     const LAST_KEY = 'inbox_last_submit_ts'
@@ -255,24 +263,57 @@
     function b64encode(str) { return btoa(unescape(encodeURIComponent(str))) }
     function b64decode(b64) { return decodeURIComponent(escape(atob(b64.replace(/\s/g, '')))) }
 
-    async function gh(path, opts, token) {
-      const r = await fetch(API + path, {
-        ...opts,
-        headers: { Authorization: 'Bearer ' + token, Accept: 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28', ...(opts.headers || {}) },
-      })
+    // 按指定源发请求：github 走 Authorization Bearer；gitee 走 access_token 参数
+    async function callSource(source, method, path, body) {
+      const isGitee = source === 'gitee'
+      const apiBase = isGitee ? GITEE_API : GH_API
+      const token = isGitee ? GITEE_TOKEN : GH_TOKEN
+      let url = apiBase + path
+      const headers = { Accept: isGitee ? 'application/json' : 'application/vnd.github+json' }
+      if (!isGitee) {
+        headers['Authorization'] = 'Bearer ' + token
+        headers['X-GitHub-Api-Version'] = '2022-11-28'
+      } else {
+        // Gitee：access_token 通过 query 参数注入（与 sync.js 实现一致）
+        const sep = url.includes('?') ? '&' : '?'
+        url = url + sep + 'access_token=' + encodeURIComponent(token)
+      }
+      const opts = { method: method || 'GET', headers }
+      if (body) {
+        opts.headers = { ...opts.headers, 'Content-Type': 'application/json' }
+        opts.body = JSON.stringify(body)
+      }
+      const r = await fetch(url, opts)
       const text = await r.text()
       let json = null
       try { json = text ? JSON.parse(text) : null } catch {}
       return { status: r.status, json, text }
     }
 
-    async function getInbox(token) {
-      const res = await gh(`/repos/${REPO.owner}/${REPO.name}/contents/${REPO.file}?ref=${REPO.branch}`, {}, token)
+    // 取某源的 inbox 仓库上下文
+    function repoOf(source) { return source === 'gitee' ? GITEE_REPO : GH_REPO }
+
+    // 在指定源上读取 inbox.json
+    async function getInboxOn(source) {
+      const repo = repoOf(source)
+      const res = await callSource(source, 'GET', `/repos/${repo.owner}/${repo.name}/contents/${repo.file}?ref=${repo.branch}`)
       if (res.status === 200 && res.json && res.json.content) {
         try { return { rows: JSON.parse(b64decode(res.json.content)) || [], sha: res.json.sha } } catch { return { rows: [], sha: res.json.sha } }
       }
       if (res.status === 404) return { rows: [], sha: null }
-      throw new Error('读取收件箱失败 (' + res.status + ')')
+      throw new Error('读取收件箱失败 (' + source + ': ' + res.status + ')')
+    }
+
+    // 双源读取：主源失败时自动回退另一源
+    async function getInbox() {
+      const fallback = PRIMARY_SOURCE === 'gitee' ? 'github' : 'gitee'
+      try {
+        return { ...await getInboxOn(PRIMARY_SOURCE), source: PRIMARY_SOURCE }
+      } catch (e) {
+        try { return { ...await getInboxOn(fallback), source: fallback } } catch (e2) {
+          throw new Error('两源读取均失败：' + (e.message || e) + ' / ' + (e2.message || e2))
+        }
+      }
     }
 
     function nextId(rows) {
@@ -306,18 +347,39 @@
       return code
     }
 
-    async function putInbox(token, rows, sha, rec, attempt = 0) {
-      const body = { message: 'customer submit: ' + (rec.company_name || ''), content: b64encode(JSON.stringify(rows, null, 2)), branch: REPO.branch }
+    // 在指定源上写入 inbox.json（含 409 重试）
+    async function putInboxOn(source, rows, sha, rec, attempt = 0) {
+      const repo = repoOf(source)
+      const body = { message: 'customer submit: ' + (rec.company_name || ''), content: b64encode(JSON.stringify(rows, null, 2)), branch: repo.branch }
       if (sha) body.sha = sha
-      const r = await gh(`/repos/${REPO.owner}/${REPO.name}/contents/${REPO.file}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }, token)
+      const r = await callSource(source, 'PUT', `/repos/${repo.owner}/${repo.name}/contents/${repo.file}`, body)
       if (r.status === 200 || r.status === 201) return true
       if (r.status === 409 && attempt < 3) {
-        const fresh = await getInbox(token)
+        const fresh = await getInboxOn(source)
         rec.id = nextId(fresh.rows)
         fresh.rows.push(rec)
-        return putInbox(token, fresh.rows, fresh.sha, rec, attempt + 1)
+        return putInboxOn(source, fresh.rows, fresh.sha, rec, attempt + 1)
       }
-      throw new Error('写入收件箱失败 (' + r.status + ')')
+      throw new Error('写入收件箱失败 (' + source + ': ' + r.status + ')')
+    }
+
+    // 双源写入：保证两源最终一致。先写主源，成功后写另一源；另一源失败不阻断提交成功。
+    async function putInbox(both, rows, sha, rec) {
+      // both = { source: 主源, sha: 主源 sha }
+      await putInboxOn(both.source, rows, sha, rec)
+      const fallback = both.source === 'gitee' ? 'github' : 'gitee'
+      try {
+        // 写另一源前需先取该源 sha（与本地 rows 合并写入，避免覆盖另一源上的独有数据）
+        const other = await getInboxOn(fallback)
+        const mergedMap = new Map(other.rows.map((r) => [String(r.id), r]))
+        // 本地 rows 为主（含本次提交），覆盖同 id；新增 id 直接追加
+        for (const r of rows) mergedMap.set(String(r.id), r)
+        const mergedRows = [...mergedMap.values()]
+        await putInboxOn(fallback, mergedRows, other.sha, rec)
+      } catch (e) {
+        // 另一源失败仅打印警告——主源已成功，提交视为成功
+        console.warn('[inbox] 双端写入：另一源(' + fallback + ')同步失败，主源已成功，将依赖后续同步追平：', e.message || e)
+      }
     }
 
     // 即时通知：写入成功后通知 Worker 立即向订阅端推送（零轮询延迟）。
@@ -406,8 +468,8 @@
         return
       }
 
-      const token = window.INBOX_TOKEN
-      if (!token) { setStatus('err', '服务暂未就绪，请联系管理员。'); return }
+      // 任一源令牌已配置即放行（getInbox 内部自动双源兜底）
+      if (!GH_TOKEN && !GITEE_TOKEN) { setStatus('err', '服务暂未就绪，请联系管理员。'); return }
 
       const district = districtSel.value
       const code = companySel.value
@@ -432,7 +494,7 @@
       let attFailed = false
       let attErr = ''
       try {
-        let { rows, sha } = await getInbox(token)
+        let { rows, sha, source } = await getInbox()
 
         // 附件：直传本机存储服务 files.aiesse.me（与后台管理端同一上传通道，浏览器 CORS 已验证可用）；
         // 仅当本机服务不可达时才回退 Worker /upload 中继。
@@ -470,7 +532,7 @@
           updated_at: new Date().toISOString(),
         }
         rows.push(rec)
-        await putInbox(token, rows, sha, rec)
+        await putInbox({ source }, rows, sha, rec)
         // 进件入库成功：即时触发推送（fire-and-forget，不阻塞成功提示）
         notifyPush()
         localStorage.setItem(LAST_KEY, Date.now())

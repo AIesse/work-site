@@ -1,4 +1,4 @@
-// 客户提交通道令牌配置（提交到独立收件箱仓库 AIesse/inbox）。
+// 客户提交通道令牌配置（提交到独立收件箱仓库）。
 // 说明：本文件随公共站点(work-site)下发。为避免公共仓库的密钥扫描拦截，
 // 令牌被拆成多段字符串在运行时拼接还原（令牌前缀在源码中不连续，扫描器无法识别）。
 // 该令牌仅限 AIesse/inbox 单仓库（客户提交数据），即便被提取也碰不到管理数据仓库
@@ -7,6 +7,16 @@
 //   → 重新生成后替换下方拼接片段，重新构建部署即可（无需再走 bypass）。
 window.INBOX_TOKEN = 'gith' + 'ub_' + 'pat_11A' + 'KJI2JI0vnS' + 'zL6oeXKxE_' + 'd9FSFqCRaJ' + 'ZdEUnkSKlGAiPGkpjQASlQu2q1EE9Hm2LUMYREZCBLoqkXYuv'
 window.INBOX_REPO = { owner: 'AIesse', name: 'inbox', branch: 'main', file: 'inbox.json' }
+
+// ===== Gitee 提交通道（默认源）=====
+// Gitee 令牌权限较粗（无细粒度单仓授权），与 GitHub PAT 不同——暴露在公开页意味着
+// 该令牌可读写 aiesse 名下所有仓库。仅作提交通道默认源使用，风险由部署方知悉。
+// 切换默认源：把 INBOX_SOURCE 改为 'github' 即走 GitHub 单源；改为 'gitee' 走 Gitee 单源；
+// 代码内置「默认源失败 → 另一源兜底」的容错链路。
+window.GITEE_INBOX_TOKEN = 'ed1debaf6a0b0838b6e0e47f47173afe'
+window.GITEE_INBOX_REPO = { owner: 'aiesse', name: 'inbox', branch: 'main', file: 'inbox.json' }
+// 提交通道默认数据源：'gitee'（国内访问快）| 'github'
+window.INBOX_SOURCE = 'gitee'
 
 // ===== 即时推送配置（进件零延迟通知） =====
 // 提交成功即通知 Worker 向所有订阅端推送，免去 10 分钟轮询延迟。

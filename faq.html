@@ -4,9 +4,8 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <title>问题解答 · 印章业务信息管理系统</title>
-  <meta name="description" content="印章业务常见问题解答：实时整理自 GitHub 归档工作记录，可按主题或相近主题搜索匹配。" />
-  <!-- FAQ 数据配置：设置 FAQ_WORKER_BASE 后，本页经 Worker 代理 /faq 实时拉取并整理问答（令牌仅存于服务端）。
-       未配置（或代理不可用）时回退到同目录预构建 faq.json。 -->
+  <meta name="description" content="印章业务常见问题解答：实时整理自归档工作记录，可按主题或相近主题搜索匹配。" />
+  <!-- FAQ 数据配置：默认从 Gitee raw 拉取（国内访问快），失败回退 GitHub raw、本地 ./faq.json、Worker。 -->
   <script src="./faq-config.js"></script>
   <style>
     :root { --brand: #2563eb; --brand-d: #1d4ed8; --bg: #f4f6fb; --card: #fff; --line: #e5e7eb; --text: #1f2937; --muted: #6b7280; --ok: #059669; --err: #dc2626; --warn: #b45309; }
@@ -122,7 +121,7 @@
     <div id="sentinel" class="loading" hidden>加载更多…</div>
 
     <div class="foot">
-      本页面由印章业务信息管理系统提供 · 内容实时整理自 GitHub 归档工作记录<br/>
+      本页面由印章业务信息管理系统提供 · 内容实时整理自归档工作记录（默认从 Gitee 拉，回退 GitHub）<br/>
       未找到答案？可点击上方「去反馈」提交您的问题。
     </div>
   </div>
@@ -144,15 +143,42 @@
     let renderedCount = 0  // 已渲染到列表的条数
     let loadingBatch = false
 
-    // —— 数据来源：Worker 代理 /faq（服务端持 GitHub 令牌拉取并即时整理，令牌不出前端）——
+    // —— 数据来源：Gitee raw → GitHub raw → 本地 ./faq.json → Worker ——
     // FAQ_WORKER_BASE 在 ./faq-config.js 中配置（即本推送 Worker 的部署地址）。
-    // 未配置（或代理不可用）时回退到同目录预构建 faq.json。
-    const FAQ_WORKER = (window.FAQ_WORKER_BASE || '').replace(/\/+$/, '')
-
-    // 加载策略：本地 ./faq.json 优先（随站点公开部署，国内直连，无需翻墙、不依赖被墙的
-    // *.workers.dev）。仅当本地 faq.json 缺失/为空时，才回退到 Worker 代理 /faq（服务端持令牌实时整理）。
+    // 公开仓的 raw URL 无需令牌即可访问；Gitee raw 默认（国内快），GitHub raw 兜底（国外或镜像同步延迟）。
+    // 本地 ./faq.json 随站点公开部署，无需翻墙、不依赖被墙的 *.workers.dev。
     // 注意：进度查询页(progress-query.html)仍独立使用 FAQ_WORKER_BASE 调 /progress，此处改动不影响它。
+    const FAQ_WORKER = (window.FAQ_WORKER_BASE || '').replace(/\/+$/, '')
+    const GITEE_RAW = 'https://gitee.com/aiesse/work-site/raw/main/faq.json'
+    const GH_RAW = 'https://raw.githubusercontent.com/AIesse/work-site/main/faq.json'
+
+    async function loadFromRaw(url) {
+      const res = await fetch(url, { cache: 'no-cache' })
+      if (!res.ok) throw new Error('HTTP ' + res.status)
+      const data = await res.json()
+      const items = Array.isArray(data.items) ? data.items : []
+      if (!items.length) throw new Error('空数据')
+      return { items, source: url.includes('gitee.com') ? 'Gitee' : 'GitHub' }
+    }
+
     async function loadData() {
+      // 1) Gitee raw（默认，国内访问快）
+      try {
+        const r = await loadFromRaw(GITEE_RAW)
+        liveFlag = true; liveSource = r.source + ' 实时数据'
+        return r.items
+      } catch (e) {
+        console.warn('Gitee raw 拉取失败，回退 GitHub raw：', e)
+      }
+      // 2) GitHub raw 兜底
+      try {
+        const r = await loadFromRaw(GH_RAW)
+        liveFlag = true; liveSource = r.source + ' 实时数据'
+        return r.items
+      } catch (e) {
+        console.warn('GitHub raw 拉取失败，回退本地 faq.json：', e)
+      }
+      // 3) 本地 ./faq.json（随站点公开部署，无需翻墙）
       try {
         const res = await fetch('./faq.json', { cache: 'no-cache' })
         if (res.ok) {
@@ -166,6 +192,7 @@
       } catch (e) {
         console.warn('本地 faq.json 读取失败，尝试 Worker 兜底：', e)
       }
+      // 4) Worker /faq 代理（服务端持令牌实时整理，最后兜底）
       if (FAQ_WORKER) {
         try {
           const res = await fetch(FAQ_WORKER + '/faq', { cache: 'no-cache' })
@@ -174,7 +201,7 @@
             const items = Array.isArray(data.items) ? data.items : []
             if (items.length) {
               liveFlag = true
-              liveSource = data.source || 'GitHub 实时数据'
+              liveSource = data.source || 'Worker 实时数据'
               return items
             }
           }
@@ -182,7 +209,7 @@
           console.warn('Worker /faq 拉取失败：', e)
         }
       }
-      throw new Error('本地 faq.json 与 Worker 代理均不可用')
+      throw new Error('Gitee raw / GitHub raw / 本地 faq.json / Worker 代理均不可用')
     }
 
     // —— 文本相似度：中文按 2-gram 切分（短词退化为字符），计算 Jaccard 重叠 ——
