@@ -18,6 +18,14 @@ window.GITEE_INBOX_REPO = { owner: 'aiesse', name: 'inbox', branch: 'main', file
 // 提交通道默认数据源：'gitee'（国内访问快）| 'github'
 window.INBOX_SOURCE = 'gitee'
 
+// ===== FAQ 数据源（faq.html 用）=====
+// faq.json 部署在公开仓 work-site 内，Gitee raw URL 受限（公开仓也需登录态），
+// 故 faq.html 走 contents API（需令牌）。令牌复用上面的 GITEE_INBOX_TOKEN / INBOX_TOKEN。
+window.GITEE_FAQ_REPO = { owner: 'aiesse', name: 'work-site', branch: 'main', file: 'faq.json' }
+window.GH_FAQ_REPO = { owner: 'AIesse', name: 'work-site', branch: 'main', file: 'faq.json' }
+// FAQ 默认数据源：'gitee' | 'github'；失败回退另一源、本地 ./faq.json、Worker
+window.FAQ_SOURCE = 'gitee'
+
 // ===== 即时推送配置（进件零延迟通知） =====
 // 提交成功即通知 Worker 向所有订阅端推送，免去 10 分钟轮询延迟。
 // 1) PUSH_NOTIFY_SECRET：与 Worker 的 NOTIFY_SECRET 一致（构建时填，拆分拼接防 GitHub 密钥扫描）。

@@ -5,7 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <title>问题解答 · 印章业务信息管理系统</title>
   <meta name="description" content="印章业务常见问题解答：实时整理自归档工作记录，可按主题或相近主题搜索匹配。" />
-  <!-- FAQ 数据配置：默认从 Gitee raw 拉取（国内访问快），失败回退 GitHub raw、本地 ./faq.json、Worker。 -->
+  <!-- FAQ 数据源配置：默认从 Gitee contents API 拉取（国内访问快），失败回退 GitHub contents API、本地 ./faq.json、Worker。
+       令牌与 inbox 共用（见 inbox-config.js 的 GITEE_INBOX_TOKEN / INBOX_TOKEN），work-site 为公开仓。 -->
+  <script src="./inbox-config.js"></script>
   <script src="./faq-config.js"></script>
   <style>
     :root { --brand: #2563eb; --brand-d: #1d4ed8; --bg: #f4f6fb; --card: #fff; --line: #e5e7eb; --text: #1f2937; --muted: #6b7280; --ok: #059669; --err: #dc2626; --warn: #b45309; }
@@ -143,40 +145,61 @@
     let renderedCount = 0  // 已渲染到列表的条数
     let loadingBatch = false
 
-    // —— 数据来源：Gitee raw → GitHub raw → 本地 ./faq.json → Worker ——
-    // FAQ_WORKER_BASE 在 ./faq-config.js 中配置（即本推送 Worker 的部署地址）。
-    // 公开仓的 raw URL 无需令牌即可访问；Gitee raw 默认（国内快），GitHub raw 兜底（国外或镜像同步延迟）。
+    // —— 数据来源：Gitee contents API → GitHub contents API → 本地 ./faq.json → Worker ——
+    // Gitee raw URL 公开仓也需登录态（平台限制），故走 contents API + 令牌解码 base64。
+    // 令牌复用 inbox-config.js 的 GITEE_INBOX_TOKEN / INBOX_TOKEN（work-site 公开仓只读）。
     // 本地 ./faq.json 随站点公开部署，无需翻墙、不依赖被墙的 *.workers.dev。
     // 注意：进度查询页(progress-query.html)仍独立使用 FAQ_WORKER_BASE 调 /progress，此处改动不影响它。
     const FAQ_WORKER = (window.FAQ_WORKER_BASE || '').replace(/\/+$/, '')
-    const GITEE_RAW = 'https://gitee.com/aiesse/work-site/raw/main/faq.json'
-    const GH_RAW = 'https://raw.githubusercontent.com/AIesse/work-site/main/faq.json'
+    const GITEE_FAQ = window.GITEE_FAQ_REPO || { owner: 'aiesse', name: 'work-site', branch: 'main', file: 'faq.json' }
+    const GH_FAQ = window.GH_FAQ_REPO || { owner: 'AIesse', name: 'work-site', branch: 'main', file: 'faq.json' }
+    const GITEE_TOK = window.GITEE_INBOX_TOKEN || ''
+    const GH_TOK = window.INBOX_TOKEN || ''
+    const FAQ_PRIMARY = window.FAQ_SOURCE === 'github' ? 'github' : 'gitee'
 
-    async function loadFromRaw(url) {
-      const res = await fetch(url, { cache: 'no-cache' })
+    function b64decode(b64) { return decodeURIComponent(escape(atob((b64 || '').replace(/\s/g, '')))) }
+
+    // 在指定源上读 faq.json（contents API），返回 { items, source }
+    async function loadFromSource(source) {
+      const isGitee = source === 'gitee'
+      const repo = isGitee ? GITEE_FAQ : GH_FAQ
+      const token = isGitee ? GITEE_TOK : GH_TOK
+      const apiBase = isGitee ? 'https://gitee.com/api/v5' : 'https://api.github.com'
+      let url = `${apiBase}/repos/${repo.owner}/${repo.name}/contents/${repo.file}?ref=${repo.branch}`
+      const headers = { Accept: isGitee ? 'application/json' : 'application/vnd.github+json' }
+      if (isGitee) {
+        url += (url.includes('?') ? '&' : '?') + 'access_token=' + encodeURIComponent(token)
+      } else {
+        headers['Authorization'] = 'Bearer ' + token
+        headers['X-GitHub-Api-Version'] = '2022-11-28'
+      }
+      const res = await fetch(url, { headers, cache: 'no-cache' })
       if (!res.ok) throw new Error('HTTP ' + res.status)
-      const data = await res.json()
+      const json = await res.json()
+      if (!json || !json.content) throw new Error('无 content 字段')
+      const data = JSON.parse(b64decode(json.content))
       const items = Array.isArray(data.items) ? data.items : []
       if (!items.length) throw new Error('空数据')
-      return { items, source: url.includes('gitee.com') ? 'Gitee' : 'GitHub' }
+      return { items, source: isGitee ? 'Gitee' : 'GitHub' }
     }
 
     async function loadData() {
-      // 1) Gitee raw（默认，国内访问快）
+      // 1) 主源（默认 Gitee contents API，国内访问快）
       try {
-        const r = await loadFromRaw(GITEE_RAW)
+        const r = await loadFromSource(FAQ_PRIMARY)
         liveFlag = true; liveSource = r.source + ' 实时数据'
         return r.items
       } catch (e) {
-        console.warn('Gitee raw 拉取失败，回退 GitHub raw：', e)
+        console.warn(FAQ_PRIMARY + ' 拉取失败，回退另一源：', e)
       }
-      // 2) GitHub raw 兜底
+      // 2) 另一源 contents API
+      const fallback = FAQ_PRIMARY === 'gitee' ? 'github' : 'gitee'
       try {
-        const r = await loadFromRaw(GH_RAW)
+        const r = await loadFromSource(fallback)
         liveFlag = true; liveSource = r.source + ' 实时数据'
         return r.items
       } catch (e) {
-        console.warn('GitHub raw 拉取失败，回退本地 faq.json：', e)
+        console.warn(fallback + ' 拉取失败，回退本地 faq.json：', e)
       }
       // 3) 本地 ./faq.json（随站点公开部署，无需翻墙）
       try {
@@ -209,7 +232,7 @@
           console.warn('Worker /faq 拉取失败：', e)
         }
       }
-      throw new Error('Gitee raw / GitHub raw / 本地 faq.json / Worker 代理均不可用')
+      throw new Error('Gitee / GitHub / 本地 faq.json / Worker 代理均不可用')
     }
 
     // —— 文本相似度：中文按 2-gram 切分（短词退化为字符），计算 Jaccard 重叠 ——
