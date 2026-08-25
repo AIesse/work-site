@@ -54,3 +54,9 @@ window.__PUSH_CONFIG__ = {
 //     失败再回退 GitHub（与 submit.html 一致）。URL 为命名隧道 ep-files 的稳定公网地址。
 window.__ATTACHMENT_BASE_URL__ = 'https://files.aiesse.me'
 window.__ATTACHMENT_TOKEN__ = 'ugw_w0juumI_uOSc45AAl-eocyBELdDL'
+
+// ===== TinyPNG 图片压缩 Key =====
+// 上传附件为图片（PNG/JPEG/WebP）时，store.jsx 会先经 TinyPNG 压缩再保存。
+// 仅作图片优化，泄露风险等同上述只读令牌；额度用尽/调用失败自动跳过压缩，不影响上传。
+// 轮换：在 TinyPNG 账户页重置 API Key，替换下方拼接片段后重新部署。
+window.__TINYPNG_API_KEY__ = 'h6N19Hjl' + 'zF7fzZSNwm5' + 'jb4X2pPhb5J4g'
