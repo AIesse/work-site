@@ -184,24 +184,16 @@
     }
 
     async function loadData() {
-      // 1) 主源（默认 Gitee contents API，国内访问快）
+      // 数据来源固定为 Gitee（aiesse/work-site 的 faq.json），不再回退 GitHub contents API 与 Worker。
+      // 仅当 Gitee 不可用时，回退到随站点一同部署的本地 ./faq.json（与 Gitee 同源的静态副本）。
       try {
-        const r = await loadFromSource(FAQ_PRIMARY)
-        liveFlag = true; liveSource = r.source + ' 实时数据'
+        const r = await loadFromSource('gitee')
+        liveFlag = true; liveSource = 'Gitee 实时数据'
         return r.items
       } catch (e) {
-        console.warn(FAQ_PRIMARY + ' 拉取失败，回退另一源：', e)
+        console.warn('Gitee 拉取失败，回退本地 faq.json：', e)
       }
-      // 2) 另一源 contents API
-      const fallback = FAQ_PRIMARY === 'gitee' ? 'github' : 'gitee'
-      try {
-        const r = await loadFromSource(fallback)
-        liveFlag = true; liveSource = r.source + ' 实时数据'
-        return r.items
-      } catch (e) {
-        console.warn(fallback + ' 拉取失败，回退本地 faq.json：', e)
-      }
-      // 3) 本地 ./faq.json（随站点公开部署，无需翻墙）
+      // 本地 ./faq.json（与 Gitee 同源，随站点公开部署，无需翻墙、不依赖被墙的 *.workers.dev）
       try {
         const res = await fetch('./faq.json', { cache: 'no-cache' })
         if (res.ok) {
@@ -213,26 +205,9 @@
           }
         }
       } catch (e) {
-        console.warn('本地 faq.json 读取失败，尝试 Worker 兜底：', e)
+        console.warn('本地 faq.json 读取失败：', e)
       }
-      // 4) Worker /faq 代理（服务端持令牌实时整理，最后兜底）
-      if (FAQ_WORKER) {
-        try {
-          const res = await fetch(FAQ_WORKER + '/faq', { cache: 'no-cache' })
-          if (res.ok) {
-            const data = await res.json()
-            const items = Array.isArray(data.items) ? data.items : []
-            if (items.length) {
-              liveFlag = true
-              liveSource = data.source || 'Worker 实时数据'
-              return items
-            }
-          }
-        } catch (e) {
-          console.warn('Worker /faq 拉取失败：', e)
-        }
-      }
-      throw new Error('Gitee / GitHub / 本地 faq.json / Worker 代理均不可用')
+      throw new Error('Gitee 与本地 faq.json 均不可用')
     }
 
     // —— 文本相似度：中文按 2-gram 切分（短词退化为字符），计算 Jaccard 重叠 ——
@@ -436,7 +411,9 @@
 
     ;(async () => {
       try {
-        ITEMS = await loadData()
+        const raw = await loadData()
+        // 仅展示「已归档」状态的数据（数据源理论上已仅含已归档，此处为防御性兜底过滤）
+        ITEMS = raw.filter((i) => (i.status || '').trim() === '已归档')
         TOPICS = [...new Set(ITEMS.map((i) => i.topic).filter(Boolean))]
         renderChips()
         renderReset()
