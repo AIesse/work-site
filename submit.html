@@ -37,9 +37,18 @@
     .hero { text-align: center; padding: 26px 0 12px; }
     .hero .badge {
       display: inline-block; font-size: 11px; font-weight: 600; letter-spacing: 1.5px; text-transform: uppercase;
-      color: var(--gold); background: rgba(232,181,88,.12); border: 1px solid rgba(232,181,88,.30);
-      border-radius: 999px; padding: 5px 14px; margin-bottom: 16px;
+      border-radius: 999px; padding: 6px 16px; margin-bottom: 16px;
+      background: rgba(255,255,255,.04); border: 1px solid var(--line-strong);
     }
+    /* 顶部徽章光泽动效：参考 getrex.tv 的「Beta coming soon · Limited seats」文字扫光 */
+    .shiny {
+      color: rgba(245,205,126,.5);
+      background: linear-gradient(120deg, rgba(232,181,88,0) 40%, rgba(245,205,126,.95) 50%, rgba(232,181,88,0) 60%);
+      background-size: 200% 100%;
+      -webkit-background-clip: text; background-clip: text;
+      animation: shine 4.5s linear infinite;
+    }
+    @keyframes shine { 0% { background-position: 100%; } 100% { background-position: -100%; } }
     .hero h1 { font-size: clamp(30px, 6.4vw, 44px); margin: 0 0 10px; letter-spacing: -.02em; font-weight: 700; }
     .hero p { font-size: 14px; color: var(--muted); margin: 0 auto; max-width: 420px; }
     .card {
@@ -66,6 +75,22 @@
     textarea { resize: vertical; min-height: 120px; }
     .grp { display: flex; gap: 12px; }
     .grp > * { flex: 1; }
+
+    /* 上传区域：点击 / 拖拽上传，统一暗金玻璃语言，避免与输入框风格割裂 */
+    .upload-zone {
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      gap: 7px; padding: 26px 16px; cursor: pointer; text-align: center;
+      border: 1px dashed var(--line-strong); border-radius: 16px;
+      background: rgba(255,255,255,.02); color: var(--muted);
+      transition: border-color .15s, background .15s, box-shadow .15s;
+    }
+    .upload-zone:hover { border-color: rgba(232,181,88,.45); background: rgba(232,181,88,.05); }
+    .upload-zone.drag { border-color: var(--gold); background: rgba(232,181,88,.10); box-shadow: 0 0 0 3px rgba(232,181,88,.15); }
+    .upload-zone .uz-icon { color: var(--gold); opacity: .9; }
+    .upload-zone .uz-text { font-size: 14px; font-weight: 600; color: var(--fg); }
+    .upload-zone .uz-sub { font-size: 12px; color: var(--faint); }
+    .upload-zone.has-file { border-style: solid; border-color: rgba(232,181,88,.35); background: rgba(232,181,88,.06); }
+    #attachment { display: none; }
     button.primary {
       width: 100%; border: none; border-radius: 999px; padding: 15px;
       font-size: 16px; font-weight: 700; cursor: pointer; margin-top: 8px;
@@ -120,7 +145,7 @@
 <body>
   <div class="wrap">
     <div class="hero">
-      <span class="badge">印章业务 · 在线反馈</span>
+      <span class="badge"><span class="shiny">印章业务 · 在线反馈</span></span>
       <h1>问题反馈</h1>
       <p>请选择您所在的行政区与企业，填写问题后提交，我们将尽快为您处理。</p>
     </div>
@@ -173,7 +198,14 @@
         </div>
         <div class="field">
           <label for="attachment">附件（可选）</label>
-          <input id="attachment" type="file" />
+          <div class="upload-zone" id="uploadZone">
+            <input id="attachment" type="file" />
+            <svg class="uz-icon" viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M12 16V7" /><path d="M8 11l4-4 4 4" /><path d="M5 18a4 4 0 0 1 .8-7.92 5.5 5.5 0 0 1 10.68-1.1A3.8 3.8 0 0 1 18.5 18H5z" />
+            </svg>
+            <div class="uz-text" id="uzText">点击或拖拽文件到此处上传</div>
+            <div class="uz-sub" id="uzSub">支持图片 / 文档，单个 ≤ 3MB</div>
+          </div>
           <div id="attHint" class="att-hint"></div>
         </div>
 
@@ -238,7 +270,14 @@
     // 选中附件后即时显示文件名/大小，便于确认已选；超出 3MB 时给出醒目警示。
     function renderAttHint() {
       const f = attachmentEl.files && attachmentEl.files[0]
-      if (!f) { attHint.innerHTML = ''; attOversize = false; return }
+      const uzText = $('uzText'), uzSub = $('uzSub'), zone = $('uploadZone')
+      if (!f) {
+        attHint.innerHTML = ''; attOversize = false
+        if (zone) zone.classList.remove('has-file')
+        if (uzText) uzText.textContent = '点击或拖拽文件到此处上传'
+        if (uzSub) uzSub.textContent = '支持图片 / 文档，单个 ≤ 3MB'
+        return
+      }
       const oversize = f.size > MAX_ATT_BYTES
       attOversize = oversize
       if (oversize) {
@@ -251,10 +290,34 @@
           '<span class="dot"></span><span>' + f.name + '（' + fmtSize(f.size) + '）</span>' +
           '<span class="x" id="attClear" title="移除附件">✕</span>'
       }
+      if (zone) zone.classList.add('has-file')
+      if (uzText) uzText.textContent = '已选择：' + f.name
+      if (uzSub) uzSub.textContent = fmtSize(f.size) + (oversize ? ' · 超出 3MB 限制' : ' · 点击可重新选择')
       const clear = $('attClear')
       if (clear) clear.addEventListener('click', () => { attachmentEl.value = ''; renderAttHint() })
     }
     attachmentEl.addEventListener('change', renderAttHint)
+
+    // 上传区域：点击选文件 + 拖拽放入（统一为暗金玻璃语言，替代原生 file 控件）
+    const uploadZone = $('uploadZone')
+    if (uploadZone) {
+      uploadZone.addEventListener('click', (e) => {
+        if (e.target.classList.contains('x')) return
+        attachmentEl.click()
+      })
+      ;['dragenter', 'dragover'].forEach((ev) =>
+        uploadZone.addEventListener(ev, (e) => { e.preventDefault(); uploadZone.classList.add('drag') }))
+      ;['dragleave', 'drop'].forEach((ev) =>
+        uploadZone.addEventListener(ev, (e) => { e.preventDefault(); if (ev === 'drop' || e.target === uploadZone) uploadZone.classList.remove('drag') }))
+      uploadZone.addEventListener('drop', (e) => {
+        const f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0]
+        if (!f) return
+        const dt = new DataTransfer()
+        dt.items.add(f)
+        attachmentEl.files = dt.files
+        renderAttHint()
+      })
+    }
 
     // 复制事项编码：写入剪贴板并短暂反馈
     const ccCopy = $('ccCopy')
