@@ -150,69 +150,83 @@
     let renderedCount = 0  // 已渲染到列表的条数
     let loadingBatch = false
 
-    // —— 数据来源：Gitee contents API → GitHub contents API → 本地 ./faq.json → Worker ——
-    // Gitee raw URL 公开仓也需登录态（平台限制），故走 contents API + 令牌解码 base64。
-    // 令牌复用 inbox-config.js 的 GITEE_INBOX_TOKEN / INBOX_TOKEN（work-site 公开仓只读）。
-    // 本地 ./faq.json 随站点公开部署，无需翻墙、不依赖被墙的 *.workers.dev。
+    // —— 数据来源：实时拉取 Gitee「工作记录 + 跟踪记录」即时整理为问答（自动同步最新归档）——
+    // Gitee contents API + 令牌解码 base64（令牌复用 inbox-config.js 的 GITEE_INBOX_TOKEN，work 仓只读）。
+    // 本地 ./faq.json 作为兜底静态副本随站点部署，仅 Gitee 不可用时启用。
     // 注意：进度查询页(progress-query.html)仍独立使用 FAQ_WORKER_BASE 调 /progress，此处改动不影响它。
-    const FAQ_WORKER = (window.FAQ_WORKER_BASE || '').replace(/\/+$/, '')
-    const GITEE_FAQ = window.GITEE_FAQ_REPO || { owner: 'aiesse', name: 'work-site', branch: 'main', file: 'faq.json' }
-    const GH_FAQ = window.GH_FAQ_REPO || { owner: 'AIesse', name: 'work-site', branch: 'main', file: 'faq.json' }
+    const GITEE_WORK = window.GITEE_WORK_REPO || { owner: 'aiesse', name: 'work', branch: 'main', logs: 'data/logs.json', tracks: 'data/tracks.json' }
     const GITEE_TOK = window.GITEE_INBOX_TOKEN || ''
-    const GH_TOK = window.INBOX_TOKEN || ''
-    const FAQ_PRIMARY = window.FAQ_SOURCE === 'github' ? 'github' : 'gitee'
+    const ARCHIVED = '已归档'
 
     function b64decode(b64) { return decodeURIComponent(escape(atob((b64 || '').replace(/\s/g, '')))) }
 
-    // 在指定源上读 faq.json（contents API），返回 { items, source }
-    async function loadFromSource(source) {
-      const isGitee = source === 'gitee'
-      const repo = isGitee ? GITEE_FAQ : GH_FAQ
-      const token = isGitee ? GITEE_TOK : GH_TOK
-      const apiBase = isGitee ? 'https://gitee.com/api/v5' : 'https://api.github.com'
-      let url = `${apiBase}/repos/${repo.owner}/${repo.name}/contents/${repo.file}?ref=${repo.branch}`
-      const headers = { Accept: isGitee ? 'application/json' : 'application/vnd.github+json' }
-      if (isGitee) {
-        url += (url.includes('?') ? '&' : '?') + 'access_token=' + encodeURIComponent(token)
-      } else {
-        headers['Authorization'] = 'Bearer ' + token
-        headers['X-GitHub-Api-Version'] = '2022-11-28'
-      }
-      const res = await fetch(url, { headers, cache: 'no-cache' })
-      if (!res.ok) throw new Error('HTTP ' + res.status)
+    // 从 Gitee contents API 拉取某个文件（Base64 解码为对象/数组）
+    async function fetchB64File(repo, path) {
+      let url = `https://gitee.com/api/v5/repos/${repo.owner}/${repo.name}/contents/${path}?ref=${repo.branch}`
+      if (GITEE_TOK) url += (url.includes('?') ? '&' : '?') + 'access_token=' + encodeURIComponent(GITEE_TOK)
+      const res = await fetch(url, { cache: 'no-cache' })
+      if (!res.ok) throw new Error('HTTP ' + res.status + ' ' + path)
       const json = await res.json()
-      if (!json || !json.content) throw new Error('无 content 字段')
-      const data = JSON.parse(b64decode(json.content))
-      const items = Array.isArray(data.items) ? data.items : []
-      if (!items.length) throw new Error('空数据')
-      return { items, source: isGitee ? 'Gitee' : 'GitHub' }
+      if (!json || !json.content) throw new Error('无 content：' + path)
+      return JSON.parse(b64decode(json.content))
+    }
+
+    // 把「已归档」工作记录即时整理为问答项（规则与 scripts/gen-faq.mjs 完全一致）：
+    // 事项 matter → question；处理方式 handling_method + 跟踪记录 tracks → answer；类型 type → topic。
+    function buildItems(logs, tracks) {
+      const tracksByLog = new Map()
+      for (const t of (tracks || [])) {
+        const lid = Number(t.log_id)
+        if (!lid) continue
+        if (!tracksByLog.has(lid)) tracksByLog.set(lid, [])
+        tracksByLog.get(lid).push(t)
+      }
+      for (const arr of tracksByLog.values()) arr.sort((a, b) => String(a.record_time || '').localeCompare(String(b.record_time || '')))
+      const items = []
+      for (const r of (logs || [])) {
+        if ((r.status || '').trim() !== ARCHIVED) continue
+        const matter = (r.matter || '').trim()
+        if (!matter) continue
+        const hm = (r.handling_method || '').trim()
+        const ts = tracksByLog.get(Number(r.id)) || []
+        const trackLines = ts.map((t) => '· ' + (t.record_time ? '[' + t.record_time + '] ' : '') + (t.content || '').trim()).filter((l) => l !== '· ')
+        const parts = []
+        if (hm) parts.push('处理方式：' + hm)
+        if (trackLines.length) parts.push('跟踪记录：\n' + trackLines.join('\n'))
+        let answer = parts.join('\n\n')
+        if (!answer) answer = '（暂无处理方式与跟踪记录）'
+        const topic = (r.type || '其他').trim() || '其他'
+        const keywords = [topic, (r.police_district || '').trim()].filter(Boolean)
+        items.push({ id: r.id, topic, keywords, question: matter, answer, source: '工作记录 #' + r.id, status: ARCHIVED, record_time: r.record_time || '' })
+      }
+      items.sort((a, b) => String(b.record_time || '').localeCompare(String(a.record_time || '')))
+      return items
     }
 
     async function loadData() {
-      // 数据来源固定为 Gitee（aiesse/work-site 的 faq.json），不再回退 GitHub contents API 与 Worker。
-      // 仅当 Gitee 不可用时，回退到随站点一同部署的本地 ./faq.json（与 Gitee 同源的静态副本）。
+      // 主源：实时拉取 Gitee work 的「工作记录 + 跟踪记录」，前端即时生成问答（自动同步最新归档）
       try {
-        const r = await loadFromSource('gitee')
-        liveFlag = true; liveSource = 'Gitee 实时数据'
-        return r.items
+        const [logs, tracks] = await Promise.all([
+          fetchB64File(GITEE_WORK, GITEE_WORK.logs),
+          fetchB64File(GITEE_WORK, GITEE_WORK.tracks).catch(() => []), // 跟踪记录缺失不影响主流程
+        ])
+        const items = buildItems(logs, tracks)
+        if (items.length) { liveFlag = true; liveSource = 'Gitee 实时数据'; return items }
       } catch (e) {
-        console.warn('Gitee 拉取失败，回退本地 faq.json：', e)
+        console.warn('Gitee 实时拉取失败，回退本地 faq.json：', e)
       }
-      // 本地 ./faq.json（与 Gitee 同源，随站点公开部署，无需翻墙、不依赖被墙的 *.workers.dev）
+      // 兜底：随站点部署的本地静态副本（Gitee 不可用时使用）
       try {
         const res = await fetch('./faq.json', { cache: 'no-cache' })
         if (res.ok) {
           const data = await res.json()
           const items = Array.isArray(data.items) ? data.items : []
-          if (items.length) {
-            liveFlag = false
-            return items
-          }
+          if (items.length) { liveFlag = false; return items }
         }
       } catch (e) {
         console.warn('本地 faq.json 读取失败：', e)
       }
-      throw new Error('Gitee 与本地 faq.json 均不可用')
+      throw new Error('Gitee 实时数据与本地 faq.json 均不可用')
     }
 
     // —— 文本相似度：中文按 2-gram 切分（短词退化为字符），计算 Jaccard 重叠 ——
@@ -423,7 +437,7 @@
         renderChips()
         renderReset()
       } catch (err) {
-        listEl.innerHTML = '<div class="empty err">加载问答数据失败：' + escapeHtml(err.message || err) + '<br/>请确认 faq.json 与本页面同目录，或在 faq-config.js 中配置 FAQ_WORKER_BASE。</div>'
+        listEl.innerHTML = '<div class="empty err">加载问答数据失败：' + escapeHtml(err.message || err) + '<br/>已尝试 Gitee 实时数据与本地 faq.json 副本，请检查网络或 Gitee 访问。</div>'
         sentinelEl.hidden = true
       }
     })()
