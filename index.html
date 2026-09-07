@@ -10,8 +10,15 @@
     <link rel="icon" type="image/png" href="./icon-192.png" />
     <link rel="apple-touch-icon" href="./icon-192.png" />
     <title>印章业务信息管理系统</title>
-    <script type="module" crossorigin src="./assets/index-Be9TbDcJ.js"></script>
-    <link rel="stylesheet" crossorigin href="./assets/index-Gghi99Vc.css">
+    <!-- 双前端入口分流：本入口为 shadcn 新版界面；若用户选择了「经典原版」，
+         在加载任何 JS 之前直接切到 classic.html（src/legacy 那套原样保留的经典前端），
+         避免多下载一份用不到的包、也避免两套样式在同一页面里打架。 -->
+    <script>
+      if (localStorage.getItem('ep_style') === 'legacy') window.location.replace('./classic.html')
+    </script>
+    <script type="module" crossorigin src="./assets/main-CktVIDI0.js"></script>
+    <link rel="modulepreload" crossorigin href="./assets/theme-CkkBRX5Q.js">
+    <link rel="stylesheet" crossorigin href="./assets/main-B139GSmh.css">
   </head>
   <body>
     <div id="root"></div>

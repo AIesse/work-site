@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="zh-CN" class="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <meta name="theme-color" content="#000000" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <link rel="icon" type="image/png" href="./icon-192.png" />
+    <link rel="apple-touch-icon" href="./icon-192.png" />
+    <title>印章业务信息管理系统</title>
+    <!-- 经典原版入口：src/legacy 下是改造前的完整前端（组件 / 页面 / 样式原样保留）。
+         若用户切换回 shadcn 新版，在加载 JS 之前直接跳回 index.html。 -->
+    <script>
+      if ((localStorage.getItem('ep_style') || 'new') !== 'legacy') window.location.replace('./index.html')
+    </script>
+    <script type="module" crossorigin src="./assets/classic-C6JY46da.js"></script>
+    <link rel="modulepreload" crossorigin href="./assets/theme-CkkBRX5Q.js">
+    <link rel="stylesheet" crossorigin href="./assets/classic-Ucl5S9-I.css">
+  </head>
+  <body>
+    <div id="root"></div>
+    <!-- 附件服务器配置注入，与 index.html 保持一致 -->
+    <script src="./inbox-config.js"></script>
+  </body>
+</html>

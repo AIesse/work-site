@@ -5,9 +5,11 @@
 // 使浏览器能检测到「有新版本」。新版就绪后**不再由 SW 自行强制刷新页面**，
 // 而是等待前端 main.jsx 发送 SKIP_WAITING，由前端在「更新进度提示」中平滑接管并重启，
 // 避免无提示的突然刷新、并能在更新时向用户展示进度。
-const SW_VERSION = '1.0.129+202609071223'
+const SW_VERSION = '1.0.130+202609071240'
 const CACHE = 'ep-shell-v3'
-const APP_SHELL = ['./', './index.html']
+// 双入口：index.html（shadcn 新版）与 classic.html（经典原版）都要预缓存，
+// 否则离线时切到另一套入口会打不开。
+const APP_SHELL = ['./', './index.html', './classic.html']
 
 self.addEventListener('install', (event) => {
   event.waitUntil(caches.open(CACHE).then((c) => c.addAll(APP_SHELL)))
@@ -116,7 +118,13 @@ self.addEventListener('fetch', (event) => {
           caches.open(CACHE).then((c) => c.put('./index.html', copy))
           return res
         })
-        .catch(() => caches.match('./index.html').then((r) => r || caches.match('./')))
+        // 离线回退：优先用缓存里与当前导航地址相同的入口（classic.html / index.html），
+        // 再兜底 index.html，避免经典原版入口离线时被打回 shadcn 界面形成来回跳转。
+        .catch(() =>
+          caches
+            .match(url.pathname)
+            .then((r) => r || caches.match('./index.html').then((r2) => r2 || caches.match('./')))
+        )
     )
     return
   }
