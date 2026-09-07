@@ -5,7 +5,7 @@
 // 使浏览器能检测到「有新版本」。新版就绪后**不再由 SW 自行强制刷新页面**，
 // 而是等待前端 main.jsx 发送 SKIP_WAITING，由前端在「更新进度提示」中平滑接管并重启，
 // 避免无提示的突然刷新、并能在更新时向用户展示进度。
-const SW_VERSION = '1.0.132+202609071408'
+const SW_VERSION = '1.0.133+202609071419'
 const CACHE = 'ep-shell-v3'
 // 双入口：index.html（shadcn 新版）与 classic.html（经典原版）都要预缓存，
 // 否则离线时切到另一套入口会打不开。
