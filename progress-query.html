@@ -282,6 +282,21 @@
   }
   const IMG_RE = /\.(png|jpe?g|gif|webp|bmp)$/i
 
+  // 把附件字段规整为 URL 字符串数组（兼容：单字符串 / 逗号分隔字符串 / 字符串数组 / 含 url 的对象数组）
+  function normAtts(a) {
+    if (!a) return []
+    if (typeof a === 'string') return a.split(/[,\s]+/).map((s) => s.trim()).filter(Boolean)
+    if (Array.isArray(a)) {
+      return a.map((x) => {
+        if (typeof x === 'string') return x.trim()
+        if (x && typeof x === 'object') return String(x.url || x.src || x.path || '').trim()
+        return ''
+      }).filter(Boolean)
+    }
+    if (typeof a === 'object' && a.url) return [String(a.url).trim()].filter(Boolean)
+    return []
+  }
+
   // 把附件数组渲染为缩略图（图片）或文件链接（其它），经 Worker /file 代理加载（免令牌）
   function renderAtts(atts) {
     if (!atts || !atts.length) return ''
