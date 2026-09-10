@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
 <title>事项进度查询 · 印章业务信息管理系统</title>
 <script src="./faq-config.js"></script>
+<script src="./inbox-config.js"></script>
 <style>
   :root {
     --bg: #050505;
@@ -143,6 +144,99 @@
 <script>
   const FAQ_WORKER = (window.FAQ_WORKER_BASE || '').replace(/\/+$/, '')
 
+  // ===== 国内直连数据源（优先）：Gitee contents API（避免 workers.dev 在大陆被拦截）=====
+  // 数据镜像仓：aiesse/inbox（inbox.json 在仓库根目录）、aiesse/work（data/logs.json、data/tracks.json）。
+  // 令牌复用 inbox-config.js 下发的 GITEE_INBOX_TOKEN（与 faq.html 同源，公开页已下发）。
+  const GITEE_TOK = window.GITEE_INBOX_TOKEN || ''
+  const GITEE_INBOX = window.GITEE_INBOX_REPO || { owner: 'aiesse', name: 'inbox', branch: 'main', file: 'inbox.json' }
+  const GITEE_WORK = window.GITEE_WORK_REPO || { owner: 'aiesse', name: 'work', branch: 'main', logs: 'data/logs.json', tracks: 'data/tracks.json' }
+
+  // Gitee 返回的 base64 按 UTF-8 安全解码（与 faq.html 一致）
+  function b64decode(b64) { return decodeURIComponent(escape(atob((b64 || '').replace(/\s/g, '')))) }
+
+  // 从 Gitee contents API 拉取某个文件并解析为对象/数组；signal 用于超时中断。
+  async function giteeFile(repo, path, signal) {
+    let url = `https://gitee.com/api/v5/repos/${repo.owner}/${repo.name}/contents/${path}?ref=${repo.branch}`
+    if (GITEE_TOK) url += (url.includes('?') ? '&' : '?') + 'access_token=' + encodeURIComponent(GITEE_TOK)
+    const res = await fetch(url, { cache: 'no-cache', signal })
+    if (!res.ok) throw new Error('HTTP ' + res.status + ' ' + path)
+    const json = await res.json()
+    if (!json || !json.content) throw new Error('无 content：' + path)
+    return JSON.parse(b64decode(json.content))
+  }
+
+  // 复刻 Worker /progress 逻辑，纯前端经 Gitee 计算进度（国内可达）。
+  async function queryViaGitee(code, signal) {
+    const [inbox, logs, tracks] = await Promise.all([
+      giteeFile(GITEE_INBOX, GITEE_INBOX.file || 'inbox.json', signal).catch(() => null),
+      giteeFile(GITEE_WORK, GITEE_WORK.logs, signal).catch(() => null),
+      giteeFile(GITEE_WORK, GITEE_WORK.tracks, signal).catch(() => null),
+    ])
+    if (!inbox && !logs) throw new Error('Gitee 数据源均不可用')
+
+    const rows = Array.isArray(inbox) ? inbox : []
+    let rec = rows.find((r) => String(r.matter_code || '').toUpperCase() === code)
+    let source = 'inbox'
+    if (!rec) {
+      const ls = Array.isArray(logs) ? logs : []
+      rec = ls.find((l) => String(l.matter_code || '').toUpperCase() === code)
+      if (rec) source = 'logs'
+    }
+    if (!rec) return { found: false, reason: 'not_found' }
+
+    const base = {
+      found: true,
+      matter_code: rec.matter_code,
+      status: rec.status || '',
+      type: rec.type || '',
+      company_name: rec.company_name || '',
+      district: rec.district || '',
+      content: source === 'logs' ? (rec.matter || rec.content || '') : (rec.content || ''),
+      created_at: source === 'logs' ? (rec.record_time || rec.created_at || '') : (rec.created_at || ''),
+      attachments: source === 'logs' ? normAtts(rec.attachments) : normAtts(rec.attachment),
+      started: false,
+      handling_method: '',
+      work_status: '',
+      tracks: [],
+    }
+
+    const logId = source === 'logs' ? Number(rec.id) : Number(rec.log_id)
+    if (logId) {
+      const ls = Array.isArray(logs) ? logs : []
+      const log = ls.find((l) => Number(l.id) === logId)
+      if (log) {
+        base.started = true
+        base.work_status = log.status || ''
+        base.handling_method = log.handling_method || ''
+      }
+      const ts = Array.isArray(tracks) ? tracks : []
+      base.tracks = ts
+        .filter((t) => Number(t.log_id) === logId)
+        .map((t) => ({ record_time: t.record_time || '', content: t.content || '', attachments: normAtts(t.attachments) }))
+        .sort((a, b) => String(a.record_time || '').localeCompare(String(b.record_time || '')))
+    }
+    return base
+  }
+
+  // 兜底：经 Worker /progress（海外可达）。
+  async function queryViaWorker(code, signal) {
+    if (!FAQ_WORKER) throw new Error('未配置 Worker')
+    const res = await fetch(FAQ_WORKER + '/progress?code=' + encodeURIComponent(code), { cache: 'no-cache', signal })
+    const text = await res.text()
+    let data = null
+    try { data = JSON.parse(text) } catch {}
+    if (!res.ok) throw new Error('HTTP ' + res.status)
+    if (!data) throw new Error('返回非 JSON')
+    return data
+  }
+
+  // 带超时的请求封装
+  function withTimeout(fn, ms) {
+    const ctrl = new AbortController()
+    const timer = setTimeout(() => ctrl.abort(), ms)
+    return fn(ctrl.signal).finally(() => clearTimeout(timer))
+  }
+
   function escapeHtml(s) {
     return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]))
   }
@@ -260,42 +354,38 @@
     result.innerHTML = ''
 
     if (!code) { showMsg('err', '请输入事项编码'); return }
-    if (!FAQ_WORKER) { showMsg('err', '查询服务未配置，请联系管理员。'); return }
 
-    // 防止重复点击；并在请求挂起时（弱网 / Worker 冷启动 / 部署中）用超时终止，避免一直转圈。
+    // 防止重复点击；查询期间禁用按钮。
     btn.disabled = true
     loading.style.display = 'block'
 
-    const controller = new AbortController()
-    const timer = setTimeout(() => controller.abort(), 15000) // 15s 超时上限
+    // 数据源策略：
+    //   1) 优先 Gitee 直连（国内可达，避免 *.workers.dev 在大陆被拦截导致一直转圈）；
+    //   2) 失败 / 超时再兜底 Worker /progress（海外可达）。
+    // 每个数据源各自 15s 超时，任一返回即用；not_found 由 Gitee 权威判定，不再二次兜底。
+    let data = null
+    let lastErr = null
     try {
-      const res = await fetch(FAQ_WORKER + '/progress?code=' + encodeURIComponent(code), {
-        cache: 'no-cache',
-        signal: controller.signal,
-      })
-      const text = await res.text()
-      clearTimeout(timer)
-      let data = null
-      try { data = JSON.parse(text) } catch {}
-      loading.style.display = 'none'
-      if (!res.ok) { showMsg('err', '查询请求失败（HTTP ' + res.status + '）'); return }
-      if (data && data.found) {
-        renderResult(data)
-      } else if (data && data.reason === 'not_found') {
-        showMsg('warn', '未查询到该事项编码对应的记录，请核对编码是否正确（区分大小写，仅含字母与数字）。')
-      } else {
-        showMsg('err', '查询失败，请稍后重试。')
-      }
-    } catch (e) {
-      clearTimeout(timer)
-      loading.style.display = 'none'
-      if (e && e.name === 'AbortError') {
-        showMsg('err', '查询超时，请稍后重试或检查网络连接。')
-      } else {
-        showMsg('err', '网络错误，请稍后重试。')
-      }
-    } finally {
-      btn.disabled = false
+      data = await withTimeout((signal) => queryViaGitee(code, signal), 15000)
+    } catch (e) { lastErr = e; data = null }
+
+    if (!data && FAQ_WORKER) {
+      try {
+        data = await withTimeout((signal) => queryViaWorker(code, signal), 15000)
+      } catch (e) { lastErr = e; data = null }
+    }
+
+    loading.style.display = 'none'
+    btn.disabled = false
+
+    if (data && data.found) {
+      renderResult(data)
+    } else if (data && data.reason === 'not_found') {
+      showMsg('warn', '未查询到该事项编码对应的记录，请核对编码是否正确（区分大小写，仅含字母与数字）。')
+    } else if (lastErr && lastErr.name === 'AbortError') {
+      showMsg('err', '查询超时，请稍后重试或检查网络连接。')
+    } else {
+      showMsg('err', '查询失败，请稍后重试。')
     }
   }
 
@@ -304,7 +394,7 @@
     if (e.key === 'Enter') doQuery()
   })
 
-  // HTTPS 下浏览器会拦截对 http 接口的混内容；本查询走同源 Worker（https），一般无此问题，
+  // HTTPS 下浏览器会拦截对 http 接口的混内容；本查询优先走 Gitee（https），失败兜底 Worker（https），一般无此问题，
   // 但提示仍保留以防 Worker 仅 http 部署。
   if (location.protocol === 'https:' && FAQ_WORKER && FAQ_WORKER.indexOf('https://') !== 0) {
     const b = document.getElementById('banner')
