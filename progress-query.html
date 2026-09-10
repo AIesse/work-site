@@ -155,14 +155,25 @@
   function b64decode(b64) { return decodeURIComponent(escape(atob((b64 || '').replace(/\s/g, '')))) }
 
   // 从 Gitee contents API 拉取某个文件并解析为对象/数组；signal 用于超时中断。
-  async function giteeFile(repo, path, signal) {
-    let url = `https://gitee.com/api/v5/repos/${repo.owner}/${repo.name}/contents/${path}?ref=${repo.branch}`
-    if (GITEE_TOK) url += (url.includes('?') ? '&' : '?') + 'access_token=' + encodeURIComponent(GITEE_TOK)
-    const res = await fetch(url, { cache: 'no-cache', signal })
-    if (!res.ok) throw new Error('HTTP ' + res.status + ' ' + path)
-    const json = await res.json()
-    if (!json || !json.content) throw new Error('无 content：' + path)
-    return JSON.parse(b64decode(json.content))
+  // 加重试：Gitee API 偶发限流/网络抖动时自动重试一次，避免偶发失败就回退到（国内常不可达的）Worker。
+  async function giteeFile(repo, path, signal, tries = 2) {
+    let lastErr
+    for (let i = 0; i < tries; i++) {
+      try {
+        let url = `https://gitee.com/api/v5/repos/${repo.owner}/${repo.name}/contents/${path}?ref=${repo.branch}`
+        if (GITEE_TOK) url += (url.includes('?') ? '&' : '?') + 'access_token=' + encodeURIComponent(GITEE_TOK)
+        const res = await fetch(url, { cache: 'no-cache', signal })
+        if (!res.ok) throw new Error('HTTP ' + res.status + ' ' + path)
+        const json = await res.json()
+        if (!json || !json.content) throw new Error('无 content：' + path)
+        return JSON.parse(b64decode(json.content))
+      } catch (e) {
+        lastErr = e
+        if (signal && signal.aborted) throw e
+        if (i < tries - 1) await new Promise((r) => setTimeout(r, 400))
+      }
+    }
+    throw lastErr
   }
 
   // 复刻 Worker /progress 逻辑，纯前端经 Gitee 计算进度（国内可达）。
