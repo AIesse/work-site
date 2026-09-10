@@ -177,23 +177,28 @@
   }
 
   // 复刻 Worker /progress 逻辑，纯前端经 Gitee 计算进度（国内可达）。
+  // 关键约束：进度查询只以「收件箱(inbox)客户提交记录」为准；一旦该提交被删除（物理移除或命中删除墓碑），
+  // 即返回 not_found，绝不回退到 work/logs 的内部处理记录——否则「已删除的问题」仍可被公开查询到。
   async function queryViaGitee(code, signal) {
-    const [inbox, logs, tracks] = await Promise.all([
+    const [inbox, logs, tracks, inboxDel, workDel] = await Promise.all([
       giteeFile(GITEE_INBOX, GITEE_INBOX.file || 'inbox.json', signal).catch(() => null),
       giteeFile(GITEE_WORK, GITEE_WORK.logs, signal).catch(() => null),
       giteeFile(GITEE_WORK, GITEE_WORK.tracks, signal).catch(() => null),
+      giteeFile(GITEE_INBOX, '_deleted.json', signal).catch(() => null),
+      giteeFile(GITEE_WORK, '_deleted.json', signal).catch(() => null),
     ])
-    if (!inbox && !logs) throw new Error('Gitee 数据源均不可用')
+    if (!inbox) throw new Error('Gitee 收件箱数据源不可用')
 
+    // 删除墓碑：{ [id]: 删除时间ISO }；命中即视为已删除
+    const delIds = (o) => (o && typeof o === 'object' ? new Set(Object.keys(o)) : new Set())
+    const inboxDeleted = delIds(inboxDel)
+    const workDeleted = delIds(workDel)
+
+    // 仅以 inbox 提交记录判定事项是否存在
     const rows = Array.isArray(inbox) ? inbox : []
-    let rec = rows.find((r) => String(r.matter_code || '').toUpperCase() === code)
-    let source = 'inbox'
-    if (!rec) {
-      const ls = Array.isArray(logs) ? logs : []
-      rec = ls.find((l) => String(l.matter_code || '').toUpperCase() === code)
-      if (rec) source = 'logs'
-    }
+    const rec = rows.find((r) => String(r.matter_code || '').toUpperCase() === code)
     if (!rec) return { found: false, reason: 'not_found' }
+    if (inboxDeleted.has(String(rec.id))) return { found: false, reason: 'not_found' }
 
     const base = {
       found: true,
@@ -202,27 +207,28 @@
       type: rec.type || '',
       company_name: rec.company_name || '',
       district: rec.district || '',
-      content: source === 'logs' ? (rec.matter || rec.content || '') : (rec.content || ''),
-      created_at: source === 'logs' ? (rec.record_time || rec.created_at || '') : (rec.created_at || ''),
-      attachments: source === 'logs' ? normAtts(rec.attachments) : normAtts(rec.attachment),
+      content: rec.content || '',
+      created_at: rec.created_at || '',
+      attachments: normAtts(rec.attachment),
       started: false,
       handling_method: '',
       work_status: '',
       tracks: [],
     }
 
-    const logId = source === 'logs' ? Number(rec.id) : Number(rec.log_id)
+    // 用收件箱记录的 log_id 关联 work/logs 的内部处理情况（仅作展示，不决定「是否存在」）
+    const logId = Number(rec.log_id)
     if (logId) {
       const ls = Array.isArray(logs) ? logs : []
       const log = ls.find((l) => Number(l.id) === logId)
-      if (log) {
+      if (log && !workDeleted.has(String(log.id))) {
         base.started = true
         base.work_status = log.status || ''
         base.handling_method = log.handling_method || ''
       }
       const ts = Array.isArray(tracks) ? tracks : []
       base.tracks = ts
-        .filter((t) => Number(t.log_id) === logId)
+        .filter((t) => Number(t.log_id) === logId && !workDeleted.has(String(t.id)))
         .map((t) => ({ record_time: t.record_time || '', content: t.content || '', attachments: normAtts(t.attachments) }))
         .sort((a, b) => String(a.record_time || '').localeCompare(String(b.record_time || '')))
     }
