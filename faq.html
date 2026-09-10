@@ -164,7 +164,15 @@
     async function fetchB64File(repo, path) {
       let url = `https://gitee.com/api/v5/repos/${repo.owner}/${repo.name}/contents/${path}?ref=${repo.branch}`
       if (GITEE_TOK) url += (url.includes('?') ? '&' : '?') + 'access_token=' + encodeURIComponent(GITEE_TOK)
-      const res = await fetch(url, { cache: 'no-cache' })
+      // 弱网 / Gitee 抖动时超时终止，避免整页一直转圈（兜底本地 faq.json 仍可用）。
+      const controller = new AbortController()
+      const timer = setTimeout(() => controller.abort(), 15000)
+      let res
+      try {
+        res = await fetch(url, { cache: 'no-cache', signal: controller.signal })
+      } finally {
+        clearTimeout(timer)
+      }
       if (!res.ok) throw new Error('HTTP ' + res.status + ' ' + path)
       const json = await res.json()
       if (!json || !json.content) throw new Error('无 content：' + path)
