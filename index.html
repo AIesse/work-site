@@ -16,12 +16,25 @@
     <script>
       if (localStorage.getItem('ep_style') === 'legacy') window.location.replace('./classic.html')
     </script>
-    <script type="module" crossorigin src="./assets/main-_d3BV9jH.js"></script>
+    <script>
+      // 判定是否运行在「独立应用」模式（添加到主屏幕的 PWA）。iOS 26/27 的独立应用里，
+      // 布局视口只到「可用区」底边，屏幕最下方的 Home Indicator 手势区会露出系统黑底 → 底部一条黑边。
+      // 这里打上标记，由 CSS 决定是否显示底部磨砂补白条（普通浏览器 Safari 的 100vh 含工具栏区，必须区分）。
+      try {
+        var sa = window.navigator.standalone === true ||
+          (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches)
+        if (sa) document.documentElement.classList.add('pwa-standalone')
+      } catch (e) { /* noop */ }
+    </script>
+    <script type="module" crossorigin src="./assets/main-C_QEZm6j.js"></script>
     <link rel="modulepreload" crossorigin href="./assets/theme-CZ3xfSgk.js">
-    <link rel="stylesheet" crossorigin href="./assets/main-BW9JWQ29.css">
+    <link rel="stylesheet" crossorigin href="./assets/main-YGrKToIo.css">
   </head>
   <body>
     <div id="root"></div>
+    <!-- iOS 独立应用底部手势区补白：铺满整屏的容器把磨砂条顶到屏幕物理底边，
+         默认不显示，仅 html.pwa-standalone 时由 CSS 启用（见 index.css .app-bottom-safe）。 -->
+    <div class="app-bottom-safe" aria-hidden="true"><div class="app-bottom-safe-bar"></div></div>
     <!-- 注入附件服务器配置（__ATTACHMENT_BASE_URL__ / __ATTACHMENT_TOKEN__ 等）：
          必须在主模块前加载，使 attachmentServer.getAttachmentBaseUrl() 能取到本地优先地址，
          否则 base 为空会直奔 GitHub 兜底。与 submit.html 保持一致。 -->
