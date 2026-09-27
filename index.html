@@ -17,37 +17,21 @@
       if (localStorage.getItem('ep_style') === 'legacy') window.location.replace('./classic.html')
     </script>
     <script>
-      // 判定是否运行在「独立应用」模式（添加到主屏幕的 PWA），供 CSS / JS 按需区分两套视口行为：
-      // 独立应用里 100vh = 真实整屏高，而 innerHeight/visualViewport/100dvh 会少算一个顶部安全区（实测 62px）。
+      // 首屏前置标记：是否「独立应用」模式（添加到主屏幕的 PWA）。
+      // 真正的视口管理（高度/安全区/软键盘/iOS 视口自愈）全部由 src/lib/viewport.js 统一负责，
+      // 这里只为了首屏渲染前就有正确的 class，避免闪烁；该模块启动时会再确认一次。
       try {
         var sa = window.navigator.standalone === true ||
           (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches)
         if (sa) document.documentElement.classList.add('pwa-standalone')
       } catch (e) { /* noop */ }
     </script>
-    <script type="module" crossorigin src="./assets/main-Cqpr8dA7.js"></script>
+    <script type="module" crossorigin src="./assets/main-BxcUFzKh.js"></script>
     <link rel="modulepreload" crossorigin href="./assets/theme-CZ3xfSgk.js">
     <link rel="stylesheet" crossorigin href="./assets/main-C2-dZJDE.css">
   </head>
   <body>
     <div id="root"></div>
-    <script>
-      // 测量「整屏(100vh) 与布局视口(innerHeight) 的差值」，仅供诊断面板读取（window.__vhGap），
-      // 不自动改变底部补白条高度。iOS 独立应用里该差值常等于顶部安全区（实测 62px）。
-      (function () {
-        try {
-          var p = document.createElement('div')
-          p.style.cssText = 'position:fixed;left:-9999px;top:0;width:1px;height:100vh;pointer-events:none;'
-          document.body.appendChild(p)
-          var vh = p.getBoundingClientRect().height
-          p.remove()
-          var gap = Math.round(vh - window.innerHeight)
-          window.__vhGap = !isFinite(gap) || gap < 0 ? 0 : gap
-        } catch (e) {
-          window.__vhGap = 0
-        }
-      })()
-    </script>
     <!-- 注入附件服务器配置（__ATTACHMENT_BASE_URL__ / __ATTACHMENT_TOKEN__ 等）：
          必须在主模块前加载，使 attachmentServer.getAttachmentBaseUrl() 能取到本地优先地址，
          否则 base 为空会直奔 GitHub 兜底。与 submit.html 保持一致。 -->
