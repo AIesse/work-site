@@ -26,15 +26,32 @@
         if (sa) document.documentElement.classList.add('pwa-standalone')
       } catch (e) { /* noop */ }
     </script>
-    <script type="module" crossorigin src="./assets/main-Br9PtT93.js"></script>
+    <script type="module" crossorigin src="./assets/main-B3tyQfe2.js"></script>
     <link rel="modulepreload" crossorigin href="./assets/theme-CZ3xfSgk.js">
-    <link rel="stylesheet" crossorigin href="./assets/main-uCfShbFY.css">
+    <link rel="stylesheet" crossorigin href="./assets/main-Dfnp-fyD.css">
   </head>
   <body>
     <div id="root"></div>
     <!-- iOS 独立应用底部手势区补白：铺满整屏的容器把磨砂条顶到屏幕物理底边，
          默认不显示，仅 html.pwa-standalone 时由 CSS 启用（见 index.css .app-bottom-safe）。 -->
     <div class="app-bottom-safe" aria-hidden="true"><div class="app-bottom-safe-bar"></div></div>
+    <script>
+      // 测量「整屏(100vh) 与布局视口(innerHeight) 的差值」，仅供诊断面板读取（window.__vhGap），
+      // 不自动改变底部补白条高度。iOS 独立应用里该差值常等于顶部安全区（实测 62px）。
+      (function () {
+        try {
+          var p = document.createElement('div')
+          p.style.cssText = 'position:fixed;left:-9999px;top:0;width:1px;height:100vh;pointer-events:none;'
+          document.body.appendChild(p)
+          var vh = p.getBoundingClientRect().height
+          p.remove()
+          var gap = Math.round(vh - window.innerHeight)
+          window.__vhGap = !isFinite(gap) || gap < 0 ? 0 : gap
+        } catch (e) {
+          window.__vhGap = 0
+        }
+      })()
+    </script>
     <!-- 注入附件服务器配置（__ATTACHMENT_BASE_URL__ / __ATTACHMENT_TOKEN__ 等）：
          必须在主模块前加载，使 attachmentServer.getAttachmentBaseUrl() 能取到本地优先地址，
          否则 base 为空会直奔 GitHub 兜底。与 submit.html 保持一致。 -->
