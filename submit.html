@@ -255,6 +255,12 @@
     const GH_TOKEN = window.INBOX_TOKEN || ''
     const GITEE_TOKEN = window.GITEE_INBOX_TOKEN || ''
     const PRIMARY_SOURCE = window.INBOX_SOURCE === 'github' ? 'github' : 'gitee'
+    // ===== SQLite 服务端提交（主通道，优先级高于 GitHub/Gitee）=====
+    //   公开提交页只持「提交专用令牌」，仅能向 inbox 实体插入数据，无法读/删/导出全库。
+    //   由 inbox-config.js 注入；未配置时自动回退原 GitHub/Gitee 双源兜底链路。
+    const SQLITE_SERVER_URL = (window.SQLITE_SERVER_URL || '').trim().replace(/\/+$/, '')
+    const SQLITE_SUBMIT_TOKEN = (window.SQLITE_SUBMIT_TOKEN || '').trim()
+    const SQLITE_READY = !!(SQLITE_SERVER_URL && SQLITE_SUBMIT_TOKEN)
     // 频次防护：同一浏览器每分钟仅允许提交一次（基于本地时间戳，刷新后仍生效）。
     const COOLDOWN_MS = 60 * 1000
     const LAST_KEY = 'inbox_last_submit_ts'
@@ -445,6 +451,26 @@
       return max + 1
     }
 
+    // 生成全局唯一数字 id（不依赖读取服务端状态）：时间戳(毫秒,13位) + 3 位随机，
+    // 足以避免同毫秒并发碰撞，供 SQLite 主通道 / GitHub 兜底共用。
+    function genId() {
+      return Number(Date.now().toString() + String(Math.floor(Math.random() * 900) + 100))
+    }
+
+    // 提交到 SQLite 服务端（用提交专用令牌，仅可写 inbox）。成功抛出之外不回退。
+    async function submitToSqlite(rec) {
+      const r = await fetch(SQLITE_SERVER_URL + '/api/entity/inbox?pk=id', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-token': SQLITE_SUBMIT_TOKEN },
+        body: JSON.stringify([rec]),
+      })
+      if (!r.ok) {
+        const t = await r.text().catch(() => '')
+        throw new Error('SQLite 写入失败 (' + r.status + ')' + (t ? '：' + t.slice(0, 100) : ''))
+      }
+      return true
+    }
+
     // 生成 6 位「英文 + 数字」混搭的唯一事项编码：
     // - 字母池排除易混淆的 I/O，数字池排除 0/1，降低客户抄写错误；
     // - 强制至少包含 1 个字母与 1 个数字（"混搭"）；
@@ -591,8 +617,8 @@
         return
       }
 
-      // 任一源令牌已配置即放行（getInbox 内部自动双源兜底）
-      if (!GH_TOKEN && !GITEE_TOKEN) { setStatus('err', '服务暂未就绪，请联系管理员。'); return }
+      // 任一通道就绪即放行：SQLite 主通道 或 GitHub/Gitee 兜底
+      if (!GH_TOKEN && !GITEE_TOKEN && !SQLITE_READY) { setStatus('err', '服务暂未就绪，请联系管理员。'); return }
 
       const district = districtSel.value
       const code = companySel.value
@@ -617,7 +643,15 @@
       let attFailed = false
       let attErr = ''
       try {
-        let { rows, sha, source } = await getInbox()
+        let rows = [], sha = null, source = PRIMARY_SOURCE
+        try {
+          const g = await getInbox()
+          rows = g.rows; sha = g.sha; source = g.source
+        } catch (e) {
+          // GitHub/Gitee 不可达：仅当 SQLite 主通道可用时仍能提交（无需先读取现有行）
+          if (!SQLITE_READY) throw e
+          console.warn('[inbox] GitHub/Gitee 读取失败，改用 SQLite 主通道：', e.message || e)
+        }
 
         // 附件：直传本机存储服务 files.aiesse.me（与后台管理端同一上传通道，浏览器 CORS 已验证可用）；
         // 仅当本机服务不可达时才回退 Worker /upload 中继。
@@ -640,7 +674,7 @@
         }
 
         const rec = {
-          id: nextId(rows),
+          id: genId(),
           matter_code: genMatterCode(rows),
           district,
           company_name,
@@ -653,6 +687,31 @@
           status: '待处理',
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
+        }
+        // —— 主通道：优先写入 SQLite 服务端（用提交专用令牌，仅可写 inbox）——
+        if (SQLITE_READY) {
+          try {
+            setStatus('loading', '正在提交到服务器…')
+            await submitToSqlite(rec)
+            // 进件入库成功：即时触发推送（fire-and-forget，不阻塞成功提示）
+            notifyPush()
+            localStorage.setItem(LAST_KEY, Date.now())
+            const okMsg = attFailed
+              ? '问题已提交成功，但附件上传失败' + (attErr ? '（' + attErr + '）' : '') + '，未随附附件。'
+              : (attachment ? '提交成功！我们已收到您的问题及附件，将尽快处理。' : '提交成功！我们已收到您的问题，将尽快处理。')
+            setStatus('ok', okMsg)
+            // 展示事项编码卡片：提示客户妥善保存，凭此编码可查询进度
+            const cc = $('codeCard'), ccVal = $('ccValue')
+            if (cc && ccVal) { ccVal.textContent = rec.matter_code; cc.style.display = 'block' }
+            contactEl.value = ''; phoneEl.value = ''; contentEl.value = ''
+            attHint.innerHTML = ''
+            attachmentEl.value = ''
+            renderCooldown()
+            return
+          } catch (e) {
+            console.warn('[inbox] SQLite 主通道写入失败，回退 GitHub/Gitee 兜底：', e.message || e)
+            setStatus('warn', '服务器写入失败，正在尝试备用通道提交…')
+          }
         }
         rows.push(rec)
         await putInbox({ source }, rows, sha, rec)

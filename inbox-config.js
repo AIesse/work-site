@@ -26,6 +26,19 @@ window.GH_FAQ_REPO = { owner: 'AIesse', name: 'work-site', branch: 'main', file:
 // FAQ 默认数据源：'gitee' | 'github'；失败回退另一源、本地 ./faq.json、Worker
 window.FAQ_SOURCE = 'gitee'
 
+// ===== 本机数据服务（客户提交主通道，可选）=====
+// 目标：客户提交的问题直接写进「这台电脑」上的数据库（sqlite-server），
+//      不再经过 GitHub / Gitee，实现「数据和附件都存放在本机」。
+// 配置方法：
+//   1) 在 sqlite-server/.env 里设置 SUBMIT_TOKEN=<一段随机串>（SUBMIT_ALLOW 默认 inbox）
+//   2) 把服务暴露到公网（Nginx 反代 / Cloudflare Tunnel，如 https://db.aiesse.me）
+//   3) 把地址与令牌填到下面两行，重新构建部署即可
+// 安全：这里放的是「提交专用令牌」——只能往 inbox 追加/更新，不能读、不能删、
+//      不能导出、不能执行 SQL，即便被提取危害也有限。管理员令牌绝不能填在这里。
+// 留空 = 自动退回原来的 GitHub / Gitee 双源提交（不影响现有流程）。
+window.SQLITE_SERVER_URL = ''
+window.SQLITE_SUBMIT_TOKEN = ''
+
 // ===== 即时推送配置（进件零延迟通知） =====
 // 提交成功即通知 Worker 向所有订阅端推送，免去 10 分钟轮询延迟。
 // 1) PUSH_NOTIFY_SECRET：与 Worker 的 NOTIFY_SECRET 一致（构建时填，拆分拼接防 GitHub 密钥扫描）。
