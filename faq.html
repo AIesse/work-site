@@ -5,8 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <title>问题解答 · 印章业务信息管理系统</title>
   <meta name="description" content="印章业务常见问题解答：实时整理自归档工作记录，可按主题或相近主题搜索匹配。" />
-  <!-- FAQ 数据源配置：默认从 Gitee contents API 拉取（国内访问快），失败回退 GitHub contents API、本地 ./faq.json、Worker。
-       令牌与 inbox 共用（见 inbox-config.js 的 GITEE_INBOX_TOKEN / INBOX_TOKEN），work-site 为公开仓。 -->
+  <!-- FAQ 数据源配置：默认从本机数据服务（zb.aiesse.me / SQLite）实时拉取，失败回退本地 ./faq.json。
+       只读令牌见 inbox-config.js 的 SQLITE_READ_TOKEN，work-site 为公开仓。 -->
   <script src="./inbox-config.js"></script>
   <script src="./faq-config.js"></script>
   <style>
@@ -128,7 +128,7 @@
     <div id="sentinel" class="loading" hidden>加载更多…</div>
 
     <div class="foot">
-      本页面由印章业务信息管理系统提供 · 内容实时整理自归档工作记录（默认从 Gitee 拉，回退 GitHub）<br/>
+      本页面由印章业务信息管理系统提供 · 内容实时整理自归档工作记录（实时数据，回退本地快照）<br/>
       未找到答案？可点击上方「去反馈」提交您的问题。
     </div>
   </div>
@@ -150,33 +150,26 @@
     let renderedCount = 0  // 已渲染到列表的条数
     let loadingBatch = false
 
-    // —— 数据来源：实时拉取 Gitee「工作记录 + 跟踪记录」即时整理为问答（自动同步最新归档）——
-    // Gitee contents API + 令牌解码 base64（令牌复用 inbox-config.js 的 GITEE_INBOX_TOKEN，work 仓只读）。
-    // 本地 ./faq.json 作为兜底静态副本随站点部署，仅 Gitee 不可用时启用。
-    // 注意：进度查询页(progress-query.html)仍独立使用 FAQ_WORKER_BASE 调 /progress，此处改动不影响它。
-    const GITEE_WORK = window.GITEE_WORK_REPO || { owner: 'aiesse', name: 'work', branch: 'main', logs: 'data/logs.json', tracks: 'data/tracks.json' }
-    const GITEE_TOK = window.GITEE_INBOX_TOKEN || ''
+    // —— 数据来源：实时拉取本机数据服务（zb.aiesse.me / SQLite）的「工作记录 + 跟踪记录」即时整理为问答 ——
+    // 经 inbox-config.js 下发的 SQLITE_READ_TOKEN 只读鉴权；本地 ./faq.json 作为兜底静态副本。
+    const SQLITE_SERVER_URL = (window.SQLITE_SERVER_URL || '').trim().replace(/\/+$/, '')
+    const SQLITE_READ_TOKEN = (window.SQLITE_READ_TOKEN || '').trim()
     const ARCHIVED = '已归档'
 
-    function b64decode(b64) { return decodeURIComponent(escape(atob((b64 || '').replace(/\s/g, '')))) }
-
-    // 从 Gitee contents API 拉取某个文件（Base64 解码为对象/数组）
-    async function fetchB64File(repo, path) {
-      let url = `https://gitee.com/api/v5/repos/${repo.owner}/${repo.name}/contents/${path}?ref=${repo.branch}`
-      if (GITEE_TOK) url += (url.includes('?') ? '&' : '?') + 'access_token=' + encodeURIComponent(GITEE_TOK)
-      // 弱网 / Gitee 抖动时超时终止，避免整页一直转圈（兜底本地 faq.json 仍可用）。
+    // 从本机数据服务读取某个实体（返回 rows 数组）
+    async function fetchEntity(name) {
+      const url = `${SQLITE_SERVER_URL}/api/entity/${name}`
       const controller = new AbortController()
       const timer = setTimeout(() => controller.abort(), 15000)
       let res
       try {
-        res = await fetch(url, { cache: 'no-cache', signal: controller.signal })
+        res = await fetch(url, { cache: 'no-cache', signal: controller.signal, headers: { 'x-token': SQLITE_READ_TOKEN } })
       } finally {
         clearTimeout(timer)
       }
-      if (!res.ok) throw new Error('HTTP ' + res.status + ' ' + path)
+      if (!res.ok) throw new Error('HTTP ' + res.status + ' ' + name)
       const json = await res.json()
-      if (!json || !json.content) throw new Error('无 content：' + path)
-      return JSON.parse(b64decode(json.content))
+      return Array.isArray(json.rows) ? json.rows : []
     }
 
     // 把「已归档」工作记录即时整理为问答项（规则与 scripts/gen-faq.mjs 完全一致）：
@@ -212,18 +205,18 @@
     }
 
     async function loadData() {
-      // 主源：实时拉取 Gitee work 的「工作记录 + 跟踪记录」，前端即时生成问答（自动同步最新归档）
+      // 主源：实时拉取本机数据服务的「工作记录 + 跟踪记录」，前端即时生成问答（自动同步最新归档）
       try {
         const [logs, tracks] = await Promise.all([
-          fetchB64File(GITEE_WORK, GITEE_WORK.logs),
-          fetchB64File(GITEE_WORK, GITEE_WORK.tracks).catch(() => []), // 跟踪记录缺失不影响主流程
+          fetchEntity('logs'),
+          fetchEntity('tracks').catch(() => []), // 跟踪记录缺失不影响主流程
         ])
         const items = buildItems(logs, tracks)
-        if (items.length) { liveFlag = true; liveSource = 'Gitee 实时数据'; return items }
+        if (items.length) { liveFlag = true; liveSource = '实时数据'; return items }
       } catch (e) {
-        console.warn('Gitee 实时拉取失败，回退本地 faq.json：', e)
+        console.warn('SQLite 实时拉取失败，回退本地 faq.json：', e)
       }
-      // 兜底：随站点部署的本地静态副本（Gitee 不可用时使用）
+      // 兜底：随站点部署的本地静态副本
       try {
         const res = await fetch('./faq.json', { cache: 'no-cache' })
         if (res.ok) {
@@ -234,7 +227,7 @@
       } catch (e) {
         console.warn('本地 faq.json 读取失败：', e)
       }
-      throw new Error('Gitee 实时数据与本地 faq.json 均不可用')
+      throw new Error('实时数据与本地 faq.json 均不可用')
     }
 
     // —— 文本相似度：中文按 2-gram 切分（短词退化为字符），计算 Jaccard 重叠 ——
@@ -445,7 +438,7 @@
         renderChips()
         renderReset()
       } catch (err) {
-        listEl.innerHTML = '<div class="empty err">加载问答数据失败：' + escapeHtml(err.message || err) + '<br/>已尝试 Gitee 实时数据与本地 faq.json 副本，请检查网络或 Gitee 访问。</div>'
+        listEl.innerHTML = '<div class="empty err">加载问答数据失败：' + escapeHtml(err.message || err) + '<br/>已尝试实时数据与本地 faq.json 副本，请检查网络。</div>'
         sentinelEl.hidden = true
       }
     })()

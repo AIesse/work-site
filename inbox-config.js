@@ -8,36 +8,32 @@
 window.INBOX_TOKEN = 'gith' + 'ub_' + 'pat_11A' + 'KJI2JI0vnS' + 'zL6oeXKxE_' + 'd9FSFqCRaJ' + 'ZdEUnkSKlGAiPGkpjQASlQu2q1EE9Hm2LUMYREZCBLoqkXYuv'
 window.INBOX_REPO = { owner: 'AIesse', name: 'inbox', branch: 'main', file: 'inbox.json' }
 
-// ===== Gitee 提交通道（默认源）=====
-// Gitee 令牌权限较粗（无细粒度单仓授权），与 GitHub PAT 不同——暴露在公开页意味着
-// 该令牌可读写 aiesse 名下所有仓库。仅作提交通道默认源使用，风险由部署方知悉。
-// 切换默认源：把 INBOX_SOURCE 改为 'github' 即走 GitHub 单源；改为 'gitee' 走 Gitee 单源；
-// 代码内置「默认源失败 → 另一源兜底」的容错链路。
-window.GITEE_INBOX_TOKEN = 'ed1debaf6a0b0838b6e0e47f47173afe'
-window.GITEE_INBOX_REPO = { owner: 'aiesse', name: 'inbox', branch: 'main', file: 'inbox.json' }
-// 提交通道默认数据源：'gitee'（国内访问快）| 'github'
-window.INBOX_SOURCE = 'gitee'
+// ===== 提交通道默认源（仅 GitHub）=====
+// 客户提交主通道为下方「本机数据服务」；GitHub 仅作兜底源。
+window.INBOX_SOURCE = 'github'
 
 // ===== FAQ 数据源（faq.html 用）=====
-// faq.json 部署在公开仓 work-site 内，Gitee raw URL 受限（公开仓也需登录态），
-// 故 faq.html 走 contents API（需令牌）。令牌复用上面的 GITEE_INBOX_TOKEN / INBOX_TOKEN。
-window.GITEE_FAQ_REPO = { owner: 'aiesse', name: 'work-site', branch: 'main', file: 'faq.json' }
+// faq.json 部署在公开仓 work-site 内，faq.html 走 contents API（GitHub）。
 window.GH_FAQ_REPO = { owner: 'AIesse', name: 'work-site', branch: 'main', file: 'faq.json' }
-// FAQ 默认数据源：'gitee' | 'github'；失败回退另一源、本地 ./faq.json、Worker
-window.FAQ_SOURCE = 'gitee'
+// FAQ 默认数据源：'github'；失败回退本地 ./faq.json、Worker
+window.FAQ_SOURCE = 'github'
 
 // ===== 本机数据服务（客户提交主通道，可选）=====
 // 目标：客户提交的问题直接写进「这台电脑」上的数据库（sqlite-server），
-//      不再经过 GitHub / Gitee，实现「数据和附件都存放在本机」。
+//      不经过 GitHub，实现「数据和附件都存放在本机」。
 // 配置方法：
 //   1) 在 sqlite-server/.env 里设置 SUBMIT_TOKEN=<一段随机串>（SUBMIT_ALLOW 默认 inbox）
 //   2) 把服务暴露到公网（Nginx 反代 / Cloudflare Tunnel，如 https://zb.aiesse.me）
 //   3) 把地址与令牌填到下面两行，重新构建部署即可
 // 安全：这里放的是「提交专用令牌」——只能往 inbox 追加/更新，不能读、不能删、
 //      不能导出、不能执行 SQL，即便被提取危害也有限。管理员令牌绝不能填在这里。
-// 留空 = 自动退回原来的 GitHub / Gitee 双源提交（不影响现有流程）。
+// 留空 = 自动退回原来的 GitHub 提交兜底链路。
 window.SQLITE_SERVER_URL = 'https://zb.aiesse.me'
 window.SQLITE_SUBMIT_TOKEN = 'bc2b7c290c2e51032900e52460882de3'
+// 只读令牌（公开页下发，仅可查询，不能写/删/导出）：供 faq.html / progress-query.html
+// 经本机数据服务读取公开数据（inbox / logs / tracks）。如怀疑泄露，单独轮换此令牌即可，
+// 不影响管理员令牌与提交令牌。
+window.SQLITE_READ_TOKEN = '20b0243380e2d112a2ddfe098af5fcfb171ece584e5235d7'
 
 // ===== 即时推送配置（进件零延迟通知） =====
 // 提交成功即通知 Worker 向所有订阅端推送，免去 10 分钟轮询延迟。

@@ -245,19 +245,14 @@
   </div>
 
   <script>
-    // ===== 双源配置（Gitee 默认 + GitHub 兜底，由 inbox-config.js 注入）=====
-    //   INBOX_SOURCE = 'gitee' | 'github'：主源（默认 gitee，国内访问快）
-    //   主源失败时自动回退另一源，保证提交链路可用
+    // ===== 提交通道配置（SQLite 主通道 + GitHub 兜底，由 inbox-config.js 注入）=====
     const GH_API = 'https://api.github.com'
-    const GITEE_API = 'https://gitee.com/api/v5'
     const GH_REPO = window.INBOX_REPO || { owner: 'AIesse', name: 'inbox', branch: 'main', file: 'inbox.json' }
-    const GITEE_REPO = window.GITEE_INBOX_REPO || { owner: 'aiesse', name: 'inbox', branch: 'main', file: 'inbox.json' }
     const GH_TOKEN = window.INBOX_TOKEN || ''
-    const GITEE_TOKEN = window.GITEE_INBOX_TOKEN || ''
-    const PRIMARY_SOURCE = window.INBOX_SOURCE === 'github' ? 'github' : 'gitee'
-    // ===== SQLite 服务端提交（主通道，优先级高于 GitHub/Gitee）=====
+    const PRIMARY_SOURCE = 'github'
+    // ===== SQLite 服务端提交（主通道，优先级高于 GitHub 兜底）=====
     //   公开提交页只持「提交专用令牌」，仅能向 inbox 实体插入数据，无法读/删/导出全库。
-    //   由 inbox-config.js 注入；未配置时自动回退原 GitHub/Gitee 双源兜底链路。
+    //   由 inbox-config.js 注入；未配置时自动回退 GitHub 兜底链路。
     const SQLITE_SERVER_URL = (window.SQLITE_SERVER_URL || '').trim().replace(/\/+$/, '')
     const SQLITE_SUBMIT_TOKEN = (window.SQLITE_SUBMIT_TOKEN || '').trim()
     const SQLITE_READY = !!(SQLITE_SERVER_URL && SQLITE_SUBMIT_TOKEN)
@@ -392,21 +387,14 @@
     function b64encode(str) { return btoa(unescape(encodeURIComponent(str))) }
     function b64decode(b64) { return decodeURIComponent(escape(atob(b64.replace(/\s/g, '')))) }
 
-    // 按指定源发请求：github 走 Authorization Bearer；gitee 走 access_token 参数
+    // 向 GitHub 发请求（Authorization Bearer）
     async function callSource(source, method, path, body) {
-      const isGitee = source === 'gitee'
-      const apiBase = isGitee ? GITEE_API : GH_API
-      const token = isGitee ? GITEE_TOKEN : GH_TOKEN
-      let url = apiBase + path
-      const headers = { Accept: isGitee ? 'application/json' : 'application/vnd.github+json' }
-      if (!isGitee) {
-        headers['Authorization'] = 'Bearer ' + token
-        headers['X-GitHub-Api-Version'] = '2022-11-28'
-      } else {
-        // Gitee：access_token 通过 query 参数注入（与 sync.js 实现一致）
-        const sep = url.includes('?') ? '&' : '?'
-        url = url + sep + 'access_token=' + encodeURIComponent(token)
-      }
+      const apiBase = GH_API
+      const token = GH_TOKEN
+      const url = apiBase + path
+      const headers = { Accept: 'application/vnd.github+json' }
+      headers['Authorization'] = 'Bearer ' + token
+      headers['X-GitHub-Api-Version'] = '2022-11-28'
       const opts = { method: method || 'GET', headers }
       if (body) {
         opts.headers = { ...opts.headers, 'Content-Type': 'application/json' }
@@ -419,8 +407,8 @@
       return { status: r.status, json, text }
     }
 
-    // 取某源的 inbox 仓库上下文
-    function repoOf(source) { return source === 'gitee' ? GITEE_REPO : GH_REPO }
+    // 取 inbox 仓库上下文（GitHub）
+    function repoOf(source) { return GH_REPO }
 
     // 在指定源上读取 inbox.json
     async function getInboxOn(source) {
@@ -433,16 +421,9 @@
       throw new Error('读取收件箱失败 (' + source + ': ' + res.status + ')')
     }
 
-    // 双源读取：主源失败时自动回退另一源
+    // 读取 GitHub 上的 inbox.json
     async function getInbox() {
-      const fallback = PRIMARY_SOURCE === 'gitee' ? 'github' : 'gitee'
-      try {
-        return { ...await getInboxOn(PRIMARY_SOURCE), source: PRIMARY_SOURCE }
-      } catch (e) {
-        try { return { ...await getInboxOn(fallback), source: fallback } } catch (e2) {
-          throw new Error('两源读取均失败：' + (e.message || e) + ' / ' + (e2.message || e2))
-        }
-      }
+      return { ...await getInboxOn('github'), source: 'github' }
     }
 
     function nextId(rows) {
@@ -512,23 +493,9 @@
       throw new Error('写入收件箱失败 (' + source + ': ' + r.status + ')')
     }
 
-    // 双源写入：保证两源最终一致。先写主源，成功后写另一源；另一源失败不阻断提交成功。
+    // 写入 GitHub 上的 inbox.json（主源已成功，提交视为成功）。
     async function putInbox(both, rows, sha, rec) {
-      // both = { source: 主源, sha: 主源 sha }
-      await putInboxOn(both.source, rows, sha, rec)
-      const fallback = both.source === 'gitee' ? 'github' : 'gitee'
-      try {
-        // 写另一源前需先取该源 sha（与本地 rows 合并写入，避免覆盖另一源上的独有数据）
-        const other = await getInboxOn(fallback)
-        const mergedMap = new Map(other.rows.map((r) => [String(r.id), r]))
-        // 本地 rows 为主（含本次提交），覆盖同 id；新增 id 直接追加
-        for (const r of rows) mergedMap.set(String(r.id), r)
-        const mergedRows = [...mergedMap.values()]
-        await putInboxOn(fallback, mergedRows, other.sha, rec)
-      } catch (e) {
-        // 另一源失败仅打印警告——主源已成功，提交视为成功
-        console.warn('[inbox] 双端写入：另一源(' + fallback + ')同步失败，主源已成功，将依赖后续同步追平：', e.message || e)
-      }
+      await putInboxOn('github', rows, sha, rec)
     }
 
     // 即时通知：写入成功后通知 Worker 立即向订阅端推送（零轮询延迟）。
@@ -617,8 +584,8 @@
         return
       }
 
-      // 任一通道就绪即放行：SQLite 主通道 或 GitHub/Gitee 兜底
-      if (!GH_TOKEN && !GITEE_TOKEN && !SQLITE_READY) { setStatus('err', '服务暂未就绪，请联系管理员。'); return }
+      // 任一通道就绪即放行：SQLite 主通道 或 GitHub 兜底
+      if (!GH_TOKEN && !SQLITE_READY) { setStatus('err', '服务暂未就绪，请联系管理员。'); return }
 
       const district = districtSel.value
       const code = companySel.value
@@ -648,9 +615,9 @@
           const g = await getInbox()
           rows = g.rows; sha = g.sha; source = g.source
         } catch (e) {
-          // GitHub/Gitee 不可达：仅当 SQLite 主通道可用时仍能提交（无需先读取现有行）
+          // GitHub 不可达：仅当 SQLite 主通道可用时仍能提交（无需先读取现有行）
           if (!SQLITE_READY) throw e
-          console.warn('[inbox] GitHub/Gitee 读取失败，改用 SQLite 主通道：', e.message || e)
+          console.warn('[inbox] GitHub 读取失败，改用 SQLite 主通道：', e.message || e)
         }
 
         // 附件：直传本机存储服务 files.aiesse.me（与后台管理端同一上传通道，浏览器 CORS 已验证可用）；
@@ -709,7 +676,7 @@
             renderCooldown()
             return
           } catch (e) {
-            console.warn('[inbox] SQLite 主通道写入失败，回退 GitHub/Gitee 兜底：', e.message || e)
+            console.warn('[inbox] SQLite 主通道写入失败，回退 GitHub 兜底：', e.message || e)
             setStatus('warn', '服务器写入失败，正在尝试备用通道提交…')
           }
         }

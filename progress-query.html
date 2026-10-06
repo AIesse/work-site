@@ -144,29 +144,22 @@
 <script>
   const FAQ_WORKER = (window.FAQ_WORKER_BASE || '').replace(/\/+$/, '')
 
-  // ===== 国内直连数据源（优先）：Gitee contents API（避免 workers.dev 在大陆被拦截）=====
-  // 数据镜像仓：aiesse/inbox（inbox.json 在仓库根目录）、aiesse/work（data/logs.json、data/tracks.json）。
-  // 令牌复用 inbox-config.js 下发的 GITEE_INBOX_TOKEN（与 faq.html 同源，公开页已下发）。
-  const GITEE_TOK = window.GITEE_INBOX_TOKEN || ''
-  const GITEE_INBOX = window.GITEE_INBOX_REPO || { owner: 'aiesse', name: 'inbox', branch: 'main', file: 'inbox.json' }
-  const GITEE_WORK = window.GITEE_WORK_REPO || { owner: 'aiesse', name: 'work', branch: 'main', logs: 'data/logs.json', tracks: 'data/tracks.json' }
+  // ===== 本机数据服务（优先）：经 zb.aiesse.me / SQLite 读取（Cloudflare 国内可达）=====
+  // 只读令牌复用 inbox-config.js 下发的 SQLITE_READ_TOKEN（公开页已下发，仅可查询）。
+  const SQLITE_SERVER_URL = (window.SQLITE_SERVER_URL || '').trim().replace(/\/+$/, '')
+  const SQLITE_READ_TOKEN = (window.SQLITE_READ_TOKEN || '').trim()
 
-  // Gitee 返回的 base64 按 UTF-8 安全解码（与 faq.html 一致）
-  function b64decode(b64) { return decodeURIComponent(escape(atob((b64 || '').replace(/\s/g, '')))) }
-
-  // 从 Gitee contents API 拉取某个文件并解析为对象/数组；signal 用于超时中断。
-  // 加重试：Gitee API 偶发限流/网络抖动时自动重试一次，避免偶发失败就回退到（国内常不可达的）Worker。
-  async function giteeFile(repo, path, signal, tries = 2) {
+  // 从本机数据服务读取某个实体（返回 rows 数组）；signal 用于超时中断，偶发抖动自动重试一次。
+  async function fetchEntity(name, signal, tries = 2) {
     let lastErr
     for (let i = 0; i < tries; i++) {
       try {
-        let url = `https://gitee.com/api/v5/repos/${repo.owner}/${repo.name}/contents/${path}?ref=${repo.branch}`
-        if (GITEE_TOK) url += (url.includes('?') ? '&' : '?') + 'access_token=' + encodeURIComponent(GITEE_TOK)
-        const res = await fetch(url, { cache: 'no-cache', signal })
-        if (!res.ok) throw new Error('HTTP ' + res.status + ' ' + path)
+        const res = await fetch(`${SQLITE_SERVER_URL}/api/entity/${name}`, {
+          cache: 'no-cache', signal, headers: { 'x-token': SQLITE_READ_TOKEN },
+        })
+        if (!res.ok) throw new Error('HTTP ' + res.status + ' ' + name)
         const json = await res.json()
-        if (!json || !json.content) throw new Error('无 content：' + path)
-        return JSON.parse(b64decode(json.content))
+        return Array.isArray(json.rows) ? json.rows : []
       } catch (e) {
         lastErr = e
         if (signal && signal.aborted) throw e
@@ -176,29 +169,21 @@
     throw lastErr
   }
 
-  // 复刻 Worker /progress 逻辑，纯前端经 Gitee 计算进度（国内可达）。
-  // 关键约束：进度查询只以「收件箱(inbox)客户提交记录」为准；一旦该提交被删除（物理移除或命中删除墓碑），
-  // 即返回 not_found，绝不回退到 work/logs 的内部处理记录——否则「已删除的问题」仍可被公开查询到。
-  async function queryViaGitee(code, signal) {
-    const [inbox, logs, tracks, inboxDel, workDel] = await Promise.all([
-      giteeFile(GITEE_INBOX, GITEE_INBOX.file || 'inbox.json', signal).catch(() => null),
-      giteeFile(GITEE_WORK, GITEE_WORK.logs, signal).catch(() => null),
-      giteeFile(GITEE_WORK, GITEE_WORK.tracks, signal).catch(() => null),
-      giteeFile(GITEE_INBOX, '_deleted.json', signal).catch(() => null),
-      giteeFile(GITEE_WORK, '_deleted.json', signal).catch(() => null),
+  // 复刻 Worker /progress 逻辑，纯前端经本机数据服务计算进度（国内可达）。
+  // 关键约束：进度查询只以「收件箱(inbox)客户提交记录」为准；该记录被删除后即不在 inbox 实体中，
+  // 自然返回 not_found，绝不回退到 work/logs 的内部处理记录——否则「已删除的问题」仍可被公开查询到。
+  async function queryViaSqlite(code, signal) {
+    const [inbox, logs, tracks] = await Promise.all([
+      fetchEntity('inbox', signal).catch(() => null),
+      fetchEntity('logs', signal).catch(() => null),
+      fetchEntity('tracks', signal).catch(() => null),
     ])
-    if (!inbox) throw new Error('Gitee 收件箱数据源不可用')
+    if (!inbox) throw new Error('数据服务不可用')
 
-    // 删除墓碑：{ [id]: 删除时间ISO }；命中即视为已删除
-    const delIds = (o) => (o && typeof o === 'object' ? new Set(Object.keys(o)) : new Set())
-    const inboxDeleted = delIds(inboxDel)
-    const workDeleted = delIds(workDel)
-
-    // 仅以 inbox 提交记录判定事项是否存在
+    // 仅以 inbox 提交记录判定事项是否存在（已删除记录不在实体中，自动 not_found）
     const rows = Array.isArray(inbox) ? inbox : []
     const rec = rows.find((r) => String(r.matter_code || '').toUpperCase() === code)
     if (!rec) return { found: false, reason: 'not_found' }
-    if (inboxDeleted.has(String(rec.id))) return { found: false, reason: 'not_found' }
 
     const base = {
       found: true,
@@ -221,14 +206,14 @@
     if (logId) {
       const ls = Array.isArray(logs) ? logs : []
       const log = ls.find((l) => Number(l.id) === logId)
-      if (log && !workDeleted.has(String(log.id))) {
+      if (log) {
         base.started = true
         base.work_status = log.status || ''
         base.handling_method = log.handling_method || ''
       }
       const ts = Array.isArray(tracks) ? tracks : []
       base.tracks = ts
-        .filter((t) => Number(t.log_id) === logId && !workDeleted.has(String(t.id)))
+        .filter((t) => Number(t.log_id) === logId)
         .map((t) => ({ record_time: t.record_time || '', content: t.content || '', attachments: normAtts(t.attachments) }))
         .sort((a, b) => String(a.record_time || '').localeCompare(String(b.record_time || '')))
     }
@@ -392,13 +377,13 @@
     loading.style.display = 'block'
 
     // 数据源策略：
-    //   1) 优先 Gitee 直连（国内可达，避免 *.workers.dev 在大陆被拦截导致一直转圈）；
+    //   1) 优先本机数据服务（zb.aiesse.me / SQLite，Cloudflare 国内可达）；
     //   2) 失败 / 超时再兜底 Worker /progress（海外可达）。
-    // 每个数据源各自 15s 超时，任一返回即用；not_found 由 Gitee 权威判定，不再二次兜底。
+    // 每个数据源各自 15s 超时，任一返回即用；not_found 由数据服务权威判定，不再二次兜底。
     let data = null
     let lastErr = null
     try {
-      data = await withTimeout((signal) => queryViaGitee(code, signal), 15000)
+      data = await withTimeout((signal) => queryViaSqlite(code, signal), 15000)
     } catch (e) { lastErr = e; data = null }
 
     if (!data && FAQ_WORKER) {
@@ -426,7 +411,7 @@
     if (e.key === 'Enter') doQuery()
   })
 
-  // HTTPS 下浏览器会拦截对 http 接口的混内容；本查询优先走 Gitee（https），失败兜底 Worker（https），一般无此问题，
+  // HTTPS 下浏览器会拦截对 http 接口的混内容；本查询优先走本机数据服务（https），失败兜底 Worker（https），一般无此问题，
   // 但提示仍保留以防 Worker 仅 http 部署。
   if (location.protocol === 'https:' && FAQ_WORKER && FAQ_WORKER.indexOf('https://') !== 0) {
     const b = document.getElementById('banner')
