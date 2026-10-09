@@ -26,9 +26,9 @@
         if (sa) document.documentElement.classList.add('pwa-standalone')
       } catch (e) { /* noop */ }
     </script>
-    <script type="module" crossorigin src="./assets/main-DWbemFd1.js"></script>
+    <script type="module" crossorigin src="./assets/main-D7J1uazg.js"></script>
     <link rel="modulepreload" crossorigin href="./assets/theme-CZ3xfSgk.js">
-    <link rel="stylesheet" crossorigin href="./assets/main-i6qzeqpp.css">
+    <link rel="stylesheet" crossorigin href="./assets/main-CkG24gni.css">
   </head>
   <body>
     <div id="root"></div>
@@ -36,5 +36,98 @@
          必须在主模块前加载，使 attachmentServer.getAttachmentBaseUrl() 能取到本地优先地址，
          否则 base 为空会直奔 GitHub 兜底。与 submit.html 保持一致。 -->
     <script src="./inbox-config.js"></script>
+    <!-- 离线自愈：本页引用的 JS/CSS 在页面加载完成后主动再请求一次，确保它们一定进了 SW 缓存。
+         为什么需要它：SW 的 install 预缓存清单是「构建期」快照，若 install 时机早于本次 index.html 的更新
+         （页面先加载、SW 后更新），清单与当前 index.html 仍可能对不上；离线打开时主包既没缓存又发不出
+         网络请求 → React 起不来 → 白屏。这里按「本页真实引用」补齐，二者永远一一对应。命中缓存时几乎零成本。 -->
+    <script>
+      ;(function () {
+        function warm() {
+          try {
+            var urls = []
+            var nodes = document.querySelectorAll('script[src],link[rel="stylesheet"][href]')
+            for (var i = 0; i < nodes.length; i++) {
+              var u = nodes[i].getAttribute('src') || nodes[i].getAttribute('href')
+              if (!u) continue
+              // 只补齐同源资源：跨域脚本（如 Cloudflare 注入的 beacon 统计脚本）
+              // 按设计不缓存，也不影响启动，没必要请求。
+              try {
+                if (new URL(u, location.href).origin !== location.origin) continue
+              } catch (e) {
+                continue
+              }
+              urls.push(u)
+            }
+            urls.forEach(function (u) {
+              fetch(u, { credentials: 'same-origin' }).catch(function () {})
+            })
+          } catch (e) {
+            /* noop */
+          }
+        }
+        if (document.readyState === 'complete') setTimeout(warm, 1500)
+        else window.addEventListener('load', function () { setTimeout(warm, 1500) })
+      })()
+    </script>
+    <!-- 白屏守护：主包若始终没执行（缓存版本错位 / 网络异常），至少要给出可读提示而不是一片白。
+         这是纯 DOM 操作，不依赖 React，因此在 React 没起来时依然有效。 -->
+    <script>
+      ;(function () {
+        var shown = false
+        var tries = 0
+        // 用轮询而不是一次性定时：第三方脚本（Cloudflare 注入的统计 beacon）离线时会挂起、
+        // 拖慢主包执行；等它失败后 React 仍可能起来，届时提示必须自动撤掉，不能一直挡着。
+        var iv = setInterval(function () {
+          tries++
+          var root = document.getElementById('root')
+          if (root && root.children.length) {
+            var g = document.getElementById('ep-boot-guard')
+            if (g && g.parentNode) g.parentNode.removeChild(g)
+            clearInterval(iv)
+            return
+          }
+          if (tries > 60) { clearInterval(iv); return }
+          if (tries < 12 || shown) return
+          shown = true
+          var wrap = document.createElement('div')
+          wrap.id = 'ep-boot-guard'
+          var online = navigator.onLine
+          wrap.setAttribute(
+            'style',
+            'position:fixed;inset:0;z-index:99999;display:flex;flex-direction:column;align-items:center;' +
+              'justify-content:center;gap:12px;padding:24px;text-align:center;background:#0b0f14;color:#e6e8eb;' +
+              'font:15px/1.7 -apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;'
+          )
+          var t = document.createElement('div')
+          t.setAttribute('style', 'font-size:17px;font-weight:600;')
+          t.textContent = '应用没能启动'
+          var d = document.createElement('div')
+          d.setAttribute('style', 'max-width:22rem;opacity:.8;')
+          d.textContent = online
+            ? '页面资源加载不完整，正在为你重新拉取…若反复出现，请退出应用后重新打开一次。'
+            : '离线缓存不完整（通常是更新后还没联网打开过一次）。请联网打开一次本应用，之后再断网即可正常使用。'
+          var b = document.createElement('button')
+          b.setAttribute(
+            'style',
+            'margin-top:8px;padding:10px 20px;border:0;border-radius:8px;background:#2f6fed;color:#fff;font-size:15px;'
+          )
+          b.textContent = '重新加载'
+          b.onclick = function () {
+            // 只在联网时清缓存：离线时清掉就只剩空缓存，重加载连旧外壳都拿不到，反而更糟。
+            // 离线重加载的意义是回到「缓存里那套完整可用」的旧版本。
+            try {
+              if (window.caches && navigator.onLine) {
+                caches.keys().then(function (ks) { ks.forEach(function (k) { caches.delete(k) }) })
+              }
+            } catch (e) {}
+            setTimeout(function () { location.reload() }, 300)
+          }
+          wrap.appendChild(t)
+          wrap.appendChild(d)
+          wrap.appendChild(b)
+          document.body.appendChild(wrap)
+        }, 1000)
+      })()
+    </script>
   </body>
 </html>
