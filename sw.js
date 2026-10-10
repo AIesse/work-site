@@ -5,7 +5,7 @@
 // 使浏览器能检测到「有新版本」。新版就绪后**不再由 SW 自行强制刷新页面**，
 // 而是等待前端 main.jsx 发送 SKIP_WAITING，由前端在「更新进度提示」中平滑接管并重启，
 // 避免无提示的突然刷新、并能在更新时向用户展示进度。
-const SW_VERSION = '1.0.278+202610101302'
+const SW_VERSION = '1.0.279+202610101432'
 const CACHE = 'ep-shell-v3'
 // 双入口：index.html（shadcn 新版）与 classic.html（经典原版）都要预缓存，
 // 否则离线时切到另一套入口会打不开。
@@ -17,7 +17,7 @@ const APP_SHELL = ['./', './index.html', './classic.html']
 // 既没命中缓存、又发不出网络请求 → 主包加载失败 → React 根本起不来 → **白屏**（且顶层 ErrorBoundary
 // 也救不了，因为它连 JS 都没执行到）。
 // 把「同一次构建产出的 index.html + JS/CSS」作为一个整体在安装阶段一次性预缓存，版本永远一致。
-const PRECACHE_MANIFEST = ["./","./index.html","./classic.html","./inbox-config.js","./manifest.webmanifest","./icon-192.png","./assets/main-wLlo_pJB.js","./assets/theme-CZ3xfSgk.js","./assets/main-B2CplrUp.css","./assets/classic-fm25x_oz.js","./assets/classic-D6b3OhT4.css"]
+const PRECACHE_MANIFEST = ["./","./index.html","./classic.html","./inbox-config.js","./manifest.webmanifest","./icon-192.png","./assets/main-XfqJSvZU.js","./assets/theme-CZ3xfSgk.js","./assets/main-CsC0kXjm.css","./assets/classic-CuPcplil.js","./assets/classic-DmL1XL5z.css"]
 
 // 第三方统计/分析脚本的域名清单（见 fetch 事件里的说明：加超时短路，避免阻塞应用主包）
 const THIRD_PARTY_ANALYTICS = [
