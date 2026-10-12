@@ -151,6 +151,7 @@
   </style>
 </head>
 <body>
+  <noscript><div style="max-width:560px;margin:40px auto;padding:24px;text-align:center;color:#f5f4f0;background:#111;border:1px solid #333;border-radius:16px;font-family:sans-serif">该提交页已迁移至 <a style="color:#e8b558" href="https://app.aiesse.me/submit.html">app.aiesse.me/submit.html</a>，请前往该地址提交问题。</div></noscript>
   <div class="wrap">
     <div class="hero">
       <span class="badge"><span class="dot"></span><span class="shiny">印章业务 · 在线反馈</span></span>
@@ -245,6 +246,14 @@
   </div>
 
   <script>
+    // ===== 单入口收敛：客户提交统一走 app.aiesse.me；旧入口 aiesse.me / www 自动跳转，避免双域名数据不一致 =====
+    ;(function () {
+      const CANON_HOST = 'app.aiesse.me'
+      const h = (location.hostname || '').toLowerCase()
+      const isCanon = h === CANON_HOST || h === 'localhost' || h === '127.0.0.1' || /^\d{1,3}(\.\d{1,3}){3}$/.test(h)
+      if (!isCanon) { location.replace('https://' + CANON_HOST + '/submit.html' + (location.search || '')) }
+    })()
+
     // ===== 提交通道配置（SQLite 主通道 + GitHub 兜底，由 inbox-config.js 注入）=====
     const GH_API = 'https://api.github.com'
     const GH_REPO = window.INBOX_REPO || { owner: 'AIesse', name: 'inbox', branch: 'main', file: 'inbox.json' }
