@@ -5,7 +5,7 @@
 // 使浏览器能检测到「有新版本」。新版就绪后**不再由 SW 自行强制刷新页面**，
 // 而是等待前端 main.jsx 发送 SKIP_WAITING，由前端在「更新进度提示」中平滑接管并重启，
 // 避免无提示的突然刷新、并能在更新时向用户展示进度。
-const SW_VERSION = '1.0.357+202610120705'
+const SW_VERSION = '1.0.362+202610120908'
 const CACHE = 'ep-shell-v3'
 // 双入口：index.html（shadcn 新版）与 classic.html（经典原版）都要预缓存，
 // 否则离线时切到另一套入口会打不开。
@@ -17,7 +17,7 @@ const APP_SHELL = ['./', './index.html', './classic.html']
 // 既没命中缓存、又发不出网络请求 → 主包加载失败 → React 根本起不来 → **白屏**（且顶层 ErrorBoundary
 // 也救不了，因为它连 JS 都没执行到）。
 // 把「同一次构建产出的 index.html + JS/CSS」作为一个整体在安装阶段一次性预缓存，版本永远一致。
-const PRECACHE_MANIFEST = ["./","./index.html","./classic.html","./inbox-config.js","./manifest.webmanifest","./icon-192.png","./assets/main-CGfC66bS.js","./assets/utils-BvZbxotI.js","./assets/main-BTV2SrM9.css","./assets/classic-DCswK0g1.js","./assets/classic-D6XTcehs.css"]
+const PRECACHE_MANIFEST = ["./","./index.html","./classic.html","./inbox-config.js","./manifest.webmanifest","./icon-192.png","./assets/main-Coe6U_5q.js","./assets/utils-BvZbxotI.js","./assets/main-Cg-lNPDU.css","./assets/classic-CcXmTFL7.js","./assets/classic-BLrsdl4m.css"]
 
 // 第三方统计/分析脚本的域名清单（见 fetch 事件里的说明：加超时短路，避免阻塞应用主包）
 const THIRD_PARTY_ANALYTICS = [
@@ -106,16 +106,20 @@ self.addEventListener('notificationclick', (event) => {
   )
 })
 
-// Web Push 推送到达：Worker 发的是「空载荷」信号，展示本地化通用通知；
-// 若日后携带载荷（event.data 不为空），优先解析 title/body。
+// Web Push 推送到达：Worker 可能发「空载荷」信号（通用通知），也可能携带载荷（event.data）
+// 含 title/body/path/tag——此时优先解析，并按 payload 的 path 跳转（分享回复通知会带上分享页地址）。
 self.addEventListener('push', (event) => {
   let title = '印章业务信息管理系统'
   let body = '有新的问题清单待处理，请打开应用查看'
+  let path = '/?view=inbox'
+  let tag = 'ep-inbox'
   try {
     if (event.data) {
       const p = event.data.json()
       if (p && p.title) title = p.title
       if (p && p.body) body = p.body
+      if (p && p.path) path = p.path
+      if (p && p.tag) tag = p.tag
     }
   } catch (_) {
     /* 解析失败则用默认文案 */
@@ -125,9 +129,9 @@ self.addEventListener('push', (event) => {
       body,
       icon: './icon-192.png',
       badge: './icon-192.png',
-      tag: 'ep-inbox',
+      tag,
       renotify: true,
-      data: { path: '/?view=inbox' },
+      data: { path },
     })
   )
 })
