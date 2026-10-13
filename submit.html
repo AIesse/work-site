@@ -213,7 +213,7 @@
               <path d="M12 16V7" /><path d="M8 11l4-4 4 4" /><path d="M5 18a4 4 0 0 1 .8-7.92 5.5 5.5 0 0 1 10.68-1.1A3.8 3.8 0 0 1 18.5 18H5z" />
             </svg>
             <div class="uz-text" id="uzText">点击或拖拽文件到此处上传</div>
-            <div class="uz-sub" id="uzSub">支持图片 / 文档，单个 ≤ 3MB</div>
+            <div class="uz-sub" id="uzSub">支持图片 / 文档，单个 ≤ 16MB</div>
           </div>
           <div id="attHint" class="att-hint"></div>
         </div>
@@ -268,8 +268,9 @@
     // 频次防护：同一浏览器每分钟仅允许提交一次（基于本地时间戳，刷新后仍生效）。
     const COOLDOWN_MS = 60 * 1000
     const LAST_KEY = 'inbox_last_submit_ts'
-    // 附件大小上限：3MB，超出提示并阻止提交。
-    const MAX_ATT_BYTES = 3 * 1024 * 1024
+    // 附件大小上限：16MB（与后端 Worker /upload 的 MAX_UPLOAD_BYTES 一致）。
+    // 超出即在前端拦截并给出友好提示，避免直接撞到后端 413 仅返回原始文本。
+    const MAX_ATT_BYTES = 16 * 1024 * 1024
     let attOversize = false
 
     const $ = (id) => document.getElementById(id)
@@ -293,7 +294,7 @@
         attHint.innerHTML = ''; attOversize = false
         if (zone) zone.classList.remove('has-file')
         if (uzText) uzText.textContent = '点击或拖拽文件到此处上传'
-        if (uzSub) uzSub.textContent = '支持图片 / 文档，单个 ≤ 3MB'
+        if (uzSub) uzSub.textContent = '支持图片 / 文档，单个 ≤ 16MB'
         return
       }
       const oversize = f.size > MAX_ATT_BYTES
@@ -301,7 +302,7 @@
       if (oversize) {
         attHint.innerHTML =
           '<span class="dot" style="background:var(--err)"></span>' +
-          '<span style="color:var(--err)">' + f.name + '（' + fmtSize(f.size) + '）超出 3MB 限制</span>' +
+          '<span style="color:var(--err)">' + f.name + '（' + fmtSize(f.size) + '）超出 16MB 限制</span>' +
           '<span class="x" id="attClear" title="移除附件">✕</span>'
       } else {
         attHint.innerHTML =
@@ -310,7 +311,7 @@
       }
       if (zone) zone.classList.add('has-file')
       if (uzText) uzText.textContent = '已选择：' + f.name
-      if (uzSub) uzSub.textContent = fmtSize(f.size) + (oversize ? ' · 超出 3MB 限制' : ' · 点击可重新选择')
+      if (uzSub) uzSub.textContent = fmtSize(f.size) + (oversize ? ' · 超出 16MB 限制' : ' · 点击可重新选择')
       const clear = $('attClear')
       if (clear) clear.addEventListener('click', () => { attachmentEl.value = ''; renderAttHint() })
     }
@@ -607,10 +608,10 @@
       if (!contact_person || !contact_phone) { setStatus('err', '请填写联系人与联系电话'); return }
       if (!content) { setStatus('err', '请填写问题内容'); return }
 
-      // 附件大小校验：超出 3MB 直接拦截，提示压缩后重试
+      // 附件大小校验：超出 16MB 直接拦截，提示压缩后重试（避免撞到后端 413 仅返回原始文本）
       const pendingFile = attachmentEl.files && attachmentEl.files[0]
       if (pendingFile && pendingFile.size > MAX_ATT_BYTES) {
-        setStatus('err', '附件大小不能超过 3MB（当前 ' + fmtSize(pendingFile.size) + '），请压缩或移除后重试。')
+        setStatus('err', '附件大小不能超过 16MB（当前 ' + fmtSize(pendingFile.size) + '），请压缩或移除后重试。')
         return
       }
 
