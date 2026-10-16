@@ -5,7 +5,7 @@
 // 使浏览器能检测到「有新版本」。新版就绪后**不再由 SW 自行强制刷新页面**，
 // 而是等待前端 main.jsx 发送 SKIP_WAITING，由前端在「更新进度提示」中平滑接管并重启，
 // 避免无提示的突然刷新、并能在更新时向用户展示进度。
-const SW_VERSION = '1.0.437+202610161135'
+const SW_VERSION = '1.0.439+202610161204'
 const CACHE = 'ep-shell-v3'
 // 双入口：index.html（shadcn 新版）与 classic.html（经典原版）都要预缓存，
 // 否则离线时切到另一套入口会打不开。
@@ -17,7 +17,7 @@ const APP_SHELL = ['./', './index.html', './classic.html']
 // 既没命中缓存、又发不出网络请求 → 主包加载失败 → React 根本起不来 → **白屏**（且顶层 ErrorBoundary
 // 也救不了，因为它连 JS 都没执行到）。
 // 把「同一次构建产出的 index.html + JS/CSS」作为一个整体在安装阶段一次性预缓存，版本永远一致。
-const PRECACHE_MANIFEST = ["./","./index.html","./classic.html","./inbox-config.js","./manifest.webmanifest","./icon-192.png","./assets/main-BB2bFfa2.js","./assets/utils-BvZbxotI.js","./assets/main-C8Xewu7M.css","./assets/classic-CI6u-fsv.js","./assets/classic-SfUnTBT0.css"]
+const PRECACHE_MANIFEST = ["./","./index.html","./classic.html","./inbox-config.js","./manifest.webmanifest","./icon-192.png","./assets/main-D1Tpf3Fp.js","./assets/utils-BvZbxotI.js","./assets/main-C8Xewu7M.css","./assets/classic-DBtiRsC_.js","./assets/classic-SfUnTBT0.css"]
 
 // 第三方统计/分析脚本的域名清单（见 fetch 事件里的说明：加超时短路，避免阻塞应用主包）
 const THIRD_PARTY_ANALYTICS = [
@@ -43,16 +43,10 @@ self.addEventListener('install', (event) => {
         return caches.open(CACHE).then((c) => c.addAll(APP_SHELL)).catch(() => {})
       })
   )
-  // 兜底：若 10s 内前端未发送 SKIP_WAITING（异常场景），自动跳过等待，
-  // 确保更新最终生效。正常情况由前端在「更新就绪」提示后主动触发。
-  event.waitUntil(
-    new Promise((resolve) => {
-      setTimeout(() => {
-        self.skipWaiting()
-        resolve()
-      }, 10000)
-    })
-  )
+  // 更新时机完全由前端控制：检测到新 SW 后由 UI 提示、用户主动点击「更新」时发 SKIP_WAITING。
+  // 不再内置 10s 自动 skipWaiting 兜底——否则会与用户点击的更新重载叠加，造成「重启两次」。
+  // 前端已通过 checkForUpdate（手动检查命中即应用）、initUpdater 的 load 阶段 r.waiting 判定、
+  // 以及更新按钮三条路径确保更新最终生效，无需 SW 自行抢跑。
 })
 
 self.addEventListener('activate', (event) => {
