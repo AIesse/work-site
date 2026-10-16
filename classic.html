@@ -13,9 +13,12 @@
     <!-- 经典原版入口：src/legacy 下是改造前的完整前端（组件 / 页面 / 样式原样保留）。
          若用户切换回 shadcn 新版，在加载 JS 之前直接跳回 index.html。 -->
     <script>
-      if ((localStorage.getItem('ep_style') || 'new') !== 'legacy') window.location.replace('./index.html')
+      // 切回 shadcn 新版入口时同样保留查询串与锚点（如 ?form=<id> 分享链接），避免参数丢失跳到主页。
+      if ((localStorage.getItem('ep_style') || 'new') !== 'legacy') {
+        window.location.replace('./index.html' + (location.search || '') + (location.hash || ''))
+      }
     </script>
-    <script type="module" crossorigin src="./assets/classic-DBtiRsC_.js"></script>
+    <script type="module" crossorigin src="./assets/classic-9fFPpN83.js"></script>
     <link rel="modulepreload" crossorigin href="./assets/utils-BvZbxotI.js">
     <link rel="stylesheet" crossorigin href="./assets/classic-SfUnTBT0.css">
   </head>
