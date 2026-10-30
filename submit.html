@@ -267,6 +267,9 @@
     const SQLITE_SERVER_URL = (window.SQLITE_SERVER_URL || '').trim().replace(/\/+$/, '')
     const SQLITE_SUBMIT_TOKEN = (window.SQLITE_SUBMIT_TOKEN || '').trim()
     const SQLITE_READY = !!(SQLITE_SERVER_URL && SQLITE_SUBMIT_TOKEN)
+    // 提交中继 Worker（可选）：云端域名的提交页经它服务端转发到本机 SQLite，规避 CORS；
+    // 配了就优先走，失败自动回退直连。地址由 inbox-config.js 的 SUBMIT_RELAY_URL 注入。
+    const SUBMIT_RELAY_URL = (window.SUBMIT_RELAY_URL || '').trim().replace(/\/+$/, '')
     // 频次防护：同一浏览器每分钟仅允许提交一次（基于本地时间戳，刷新后仍生效）。
     const COOLDOWN_MS = 60 * 1000
     const LAST_KEY = 'inbox_last_submit_ts'
@@ -460,6 +463,22 @@
       if (!r.ok) {
         const t = await r.text().catch(() => '')
         throw new Error('SQLite 写入失败 (' + r.status + ')' + (t ? '：' + t.slice(0, 100) : ''))
+      }
+      return true
+    }
+
+    // 经中继 Worker 提交：浏览器只与 Worker 通信（Worker 已放行提交页 Origin），
+    // 由 Worker 服务端调用本机 SQLite，规避云端域名直连 zb.aiesse.me 的 CORS 拦截；
+    // 失败由调用方回退到 submitToSqlite 直连。
+    async function submitViaRelay(rec) {
+      const r = await fetch(SUBMIT_RELAY_URL + '/submit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(rec),
+      })
+      if (!r.ok) {
+        const t = await r.text().catch(() => '')
+        throw new Error('中继返回 ' + r.status + (t ? '：' + t.slice(0, 120) : ''))
       }
       return true
     }
@@ -666,6 +685,30 @@
           status: '待处理',
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
+        }
+        // —— 优先走中继 Worker（服务端转发，解决云端域名 CORS 问题；云端域名的提交页必须走它）——
+        if (SUBMIT_RELAY_URL) {
+          try {
+            setStatus('loading', '正在提交…')
+            await submitViaRelay(rec)
+            // 进件入库成功：即时触发推送（fire-and-forget，不阻塞成功提示）
+            notifyPush()
+            localStorage.setItem(LAST_KEY, Date.now())
+            const okMsg = attFailed
+              ? '问题已提交成功，但附件上传失败' + (attErr ? '（' + attErr + '）' : '') + '，未随附附件。'
+              : (attachment ? '提交成功！我们已收到您的问题及附件，将尽快处理。' : '提交成功！我们已收到您的问题，将尽快处理。')
+            setStatus('ok', okMsg)
+            const cc = $('codeCard'), ccVal = $('ccValue')
+            if (cc && ccVal) { ccVal.textContent = rec.matter_code; cc.style.display = 'block' }
+            contactEl.value = ''; phoneEl.value = ''; contentEl.value = ''
+            attHint.innerHTML = ''
+            attachmentEl.value = ''
+            renderCooldown()
+            return
+          } catch (e) {
+            console.warn('[inbox] 中继提交失败，回退直连提交：', e.message || e)
+            setStatus('warn', '中继提交失败，正在尝试直连提交…')
+          }
         }
         // —— 主通道：优先写入 SQLite 服务端（用提交专用令牌，仅可写 inbox）——
         if (SQLITE_READY) {

@@ -30,6 +30,9 @@ window.FAQ_SOURCE = 'github'
 // 留空 = 自动退回原来的 GitHub 提交兜底链路。
 window.SQLITE_SERVER_URL = 'https://zb.aiesse.me'
 window.SQLITE_SUBMIT_TOKEN = 'bc2b7c290c2e51032900e52460882de3'
+// 公开提交页经此中继 Worker 提交（服务端转发到本机 SQLite，规避云端域名 CORS）；
+// 留空则提交页退回直连 zb.aiesse.me。云端域名的提交页必须走它才能真正提交成功。
+window.SUBMIT_RELAY_URL = 'https://enterprise-police-submit.xiyiread.workers.dev'
 // 只读令牌（公开页下发，仅可查询，不能写/删/导出）：供 faq.html / progress-query.html
 // 经本机数据服务读取公开数据（inbox / logs / tracks）。如怀疑泄露，单独轮换此令牌即可，
 // 不影响管理员令牌与提交令牌。
