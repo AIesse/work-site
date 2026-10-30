@@ -246,12 +246,14 @@
   </div>
 
   <script>
-    // ===== 单入口收敛：客户提交统一走 app.aiesse.me；旧入口 aiesse.me / www 自动跳转，避免双域名数据不一致 =====
+    // ===== 单入口收敛：客户提交统一走「已部署的规范域名」；旧入口 aiesse.me / www 自动跳转，
+    //   避免双域名数据不一致。云端部署（enterprise-police.app.workbuddy.host）同样视为规范域名，
+    //   不再把云端访客强制跳回 app.aiesse.me（否则云端部署的提交页会把所有人弹回旧域名）。=====
     ;(function () {
-      const CANON_HOST = 'app.aiesse.me'
+      const CANON_HOSTS = ['app.aiesse.me', 'enterprise-police.app.workbuddy.host']
       const h = (location.hostname || '').toLowerCase()
-      const isCanon = h === CANON_HOST || h === 'localhost' || h === '127.0.0.1' || /^\d{1,3}(\.\d{1,3}){3}$/.test(h)
-      if (!isCanon) { location.replace('https://' + CANON_HOST + '/submit.html' + (location.search || '')) }
+      const isCanon = CANON_HOSTS.indexOf(h) !== -1 || h === 'localhost' || h === '127.0.0.1' || /^\d{1,3}(\.\d{1,3}){3}$/.test(h)
+      if (!isCanon) { location.replace('https://' + CANON_HOSTS[0] + '/submit.html' + (location.search || '')) }
     })()
 
     // ===== 提交通道配置（SQLite 主通道 + GitHub 兜底，由 inbox-config.js 注入）=====
