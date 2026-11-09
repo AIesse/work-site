@@ -5,7 +5,7 @@
 // 使浏览器能检测到「有新版本」。新版就绪后**不再由 SW 自行强制刷新页面**，
 // 而是等待前端 main.jsx 发送 SKIP_WAITING，由前端在「更新进度提示」中平滑接管并重启，
 // 避免无提示的突然刷新、并能在更新时向用户展示进度。
-const SW_VERSION = '1.0.504+202611042356'
+const SW_VERSION = '1.0.506+202611090211'
 const CACHE = 'ep-shell-v3'
 // 双入口：index.html（shadcn 新版）与 classic.html（经典原版）都要预缓存，
 // 否则离线时切到另一套入口会打不开。
@@ -17,7 +17,7 @@ const APP_SHELL = ['./', './index.html', './classic.html']
 // 既没命中缓存、又发不出网络请求 → 主包加载失败 → React 根本起不来 → **白屏**（且顶层 ErrorBoundary
 // 也救不了，因为它连 JS 都没执行到）。
 // 把「同一次构建产出的 index.html + JS/CSS」作为一个整体在安装阶段一次性预缓存，版本永远一致。
-const PRECACHE_MANIFEST = ["./","./index.html","./classic.html","./inbox-config.js","./manifest.webmanifest","./icon-192.png","./assets/main-Ck4LWc4q.js","./assets/utils-Bcgdq-f4.js","./assets/main-zUUf1lse.css","./assets/classic-B39k3WmK.js","./assets/classic-COZ-WXNF.css"]
+const PRECACHE_MANIFEST = ["./","./index.html","./classic.html","./inbox-config.js","./manifest.webmanifest","./icon-192.png","./assets/main-DFQgSNw4.js","./assets/utils-Bcgdq-f4.js","./assets/main-zUUf1lse.css","./assets/classic-CYoeI-Ko.js","./assets/classic-COZ-WXNF.css"]
 
 // 第三方统计/分析脚本的域名清单（见 fetch 事件里的说明：加超时短路，避免阻塞应用主包）
 const THIRD_PARTY_ANALYTICS = [
@@ -79,10 +79,11 @@ self.addEventListener('message', (event) => {
   }
 })
 
-// 点击通知：聚焦已打开的 PWA 窗口（或新开一个），并跳转到问题清单
+// 点击通知：聚焦已打开的 PWA 窗口（或新开一个），并跳转到通知里指定的页面 / 具体那条问题
 self.addEventListener('notificationclick', (event) => {
   event.notification.close()
-  const target = (event.notification.data && event.notification.data.path) || '/?view=inbox'
+  // Worker 发的是空载荷唤醒信号，没有具体问题 id；latest=1 让前端打开「最新那条问题」详情。
+  const target = (event.notification.data && event.notification.data.path) || '/?view=inbox&latest=1'
   event.waitUntil(
     (async () => {
       const all = await self.clients.matchAll({ type: 'window', includeUncontrolled: true })
@@ -105,19 +106,24 @@ self.addEventListener('notificationclick', (event) => {
 self.addEventListener('push', (event) => {
   let title = '印章业务信息管理系统'
   let body = '有新的问题清单待处理，请打开应用查看'
-  let path = '/?view=inbox'
+  let path = '/?view=inbox&latest=1'
   let tag = 'ep-inbox'
+  let payloadHadPath = false
+  let recordId = ''
   try {
     if (event.data) {
       const p = event.data.json()
       if (p && p.title) title = p.title
       if (p && p.body) body = p.body
-      if (p && p.path) path = p.path
+      if (p && p.path) { path = p.path; payloadHadPath = true }
+      // Worker 即时推送会带上最新那条问题的 id；空载荷（旧 Worker / 兼容订阅）则退化为跳列表
+      if (p && p.id != null) recordId = String(p.id)
       if (p && p.tag) tag = p.tag
     }
   } catch (_) {
     /* 解析失败则用默认文案 */
   }
+  if (!payloadHadPath && recordId) path = '/?view=inbox&id=' + encodeURIComponent(recordId)
   event.waitUntil(
     self.registration.showNotification(title, {
       body,
