@@ -1,0 +1,1 @@
+:root{--ep-sym-ok: #15803d;--ep-sym-no: #b91c1c}.dark{--ep-sym-ok: #4ade80;--ep-sym-no: #f87171}.ep-sym{font-weight:600;font-variant-emoji:text}.ep-sym-ok{color:var(--ep-sym-ok, #15803d)}.ep-sym-no{color:var(--ep-sym-no, #b91c1c)}::highlight(ep-sym-hl-ok){color:var(--ep-sym-ok, #15803d)}::highlight(ep-sym-hl-no){color:var(--ep-sym-no, #b91c1c)}
